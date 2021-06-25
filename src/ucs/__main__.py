@@ -2,15 +2,17 @@ import pathlib
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 from functools import partial
-from typing import Any, List, Optional, Tuple, cast
-
+from typing import Any, List, Optional, Tuple, cast, Sequence
+from abc import ABCMeta, abstractmethod
 from raylib.colors import *
 from raylib.pyray import PyRay
+
 
 CAVE_DUDE = (0, 104, 16, 16)
 CAVE_BABE = (17, 86, 16, 16)
 ROCK = (567, 23, 16, 16)
 SHIELD = (652, 74, 16, 16)
+SWORD = (748, 123, 5, 10)
 
 TIME_STEP = 1 / 60.0
 
@@ -38,32 +40,10 @@ CONTROLS_MAP = [
 ]
 
 
-COLLIDEABLES = {}
+COLLIDERS = []
 
 
-class Entity(list):
-
-    class State(IntEnum):
-        DISABLED = 0
-        ENABLED = 1
-
-    class Kind(Enum):
-        OTHER = 'other'
-        NPC = 'npc'
-        PLAYER = 'player'
-        SHIELD = 'shield'
-
-    def __init__(self, position: List[int], components, kind: Kind=Kind.OTHER):
-        self.extend(components)
-        self.position = position
-        self.state = Entity.State.ENABLED
-        self.kind = kind
-
-
-@dataclass
-class Movement:
-    vel_x: int = 0
-    vel_y: int = 0
+PRESSED_KEYS = set()
 
 
 @dataclass
@@ -72,189 +52,272 @@ class Sprite:
 
 
 @dataclass
-class HumanControl:
-    gamepad: int
+class DrawCommand:
+
+    sprite: Sprite
+    position: Tuple[int, int]
+
+
+DRAW_LIST: List[DrawCommand] = []
+
+
+def draw_sprite(sprite: Sprite, position: Tuple[int, int]):
+    DRAW_LIST.append(DrawCommand(sprite, position))
+
+
+class Action(metaclass=ABCMeta):
+
+    @abstractmethod
+    def perform(self):
+        pass
+
+
+class Entity(metaclass=ABCMeta):
+
+    class Flags(IntEnum):
+
+        DESTROY = 1
+
+    def __init__(self, position: Tuple[int, int]):
+        self.position = list(position)
+        self.flags = 0
+
+    @property
+    def x(self) -> int:
+        return self.position[0]
+
+    @x.setter
+    def x(self, value):
+        self.position[0] = value
+
+    @property
+    def y(self) -> int:
+        return self.position[1]
+
+    @y.setter
+    def y(self, value):
+        self.position[1] = value
+
+    @abstractmethod
+    def tick(self) -> Sequence[Action]:
+        pass
 
 
 @dataclass
-class NPCControl:
-    pass
+class Collider:
 
-
-@dataclass
-class PhysicsBody:
-    mass: int
-
-
-@dataclass
-class Collideable:
+    entity: Entity
     size: int
-    collided_with: Optional[Entity] = None
+    collision: Optional[Entity] = None
+
+
+def add_collider(collider: Collider):
+    COLLIDERS.append(collider)
+
+
+def remove_collider(collider: Collider):
+    COLLIDERS.remove(collider)
 
 
 @dataclass
-class Humanoid:
-    body: Rect
-    shield: Optional[Rect] = None
+class Movement:
+
+    entity: Entity
+    vel_x: int
+    vel_y: int
 
 
-ray = None
-sheet = None
+MOVEMENT_COMPONENTS = []
+
+def add_movement_component(comp: Movement):
+    MOVEMENT_COMPONENTS.append(comp)
 
 
-player_entities = [
-    Entity([600, 200], [Humanoid(CAVE_BABE, None), Movement(), HumanControl(1), Collideable(16)], kind=Entity.Kind.PLAYER),
-]
-
-npc_entities = [
-    Entity([50, 200], [Humanoid(CAVE_DUDE, SHIELD), Movement(), NPCControl(), Collideable(16)], kind=Entity.Kind.NPC),
-]
-
-rock_entities = [
-    Entity([400, 0], [Sprite(ROCK), Movement(), PhysicsBody(1)]),
-]
-
-pickup_entities = [
-    Entity([400, 300], [Sprite(SHIELD), Collideable(32)], Entity.Kind.SHIELD),
-]
+def remove_movement_component(comp: Movement):
+    MOVEMENT_COMPONENTS.remove(comp)
 
 
-def player_wield_shield(player_entity):
-    player_entity[0].shield = SHIELD
+class Item(metaclass=ABCMeta):
+
+    class BodyPart(Enum):
+        LEFT_HAND = 'left_hand'
+        RIGHT_HAND = 'right_hand'
+
+    def __init__(self, body_part: BodyPart, sprite: Sprite):
+        self.body_part = body_part
+        self.sprite = sprite
+
+    @abstractmethod
+    def use(self) -> Action:
+        pass
 
 
-def sprite_system(entities, sprite_offset):
-    for ent in entities:
-        ray.draw_texture_rec(sheet, ent[sprite_offset].frame, ent.position, WHITE)
+class Shield(Item):
+
+    def __init__(self):
+        super().__init__(Item.BodyPart.RIGHT_HAND, Sprite(SHIELD))
+
+    def use(self) -> Action:
+        pass
 
 
-def humanoid_system(entities, humanoid_offset):
-    for ent in entities:
-        humanoid = ent[humanoid_offset]
-        ray.draw_texture_rec(sheet, humanoid.body, ent.position, WHITE)
-        if humanoid.shield is not None:
-            shield_x, shield_y = ent.position
-            shield_x += 8
-            shield_y += 3
-            ray.draw_texture_rec(sheet, humanoid.shield, (shield_x, shield_y), WHITE)
+class Sword(Item):
+
+    def __init__(self):
+        super().__init__(Item.BodyPart.LEFT_HAND, Sprite(SWORD))
+
+    def use(self) -> Action:
+        pass
 
 
-def movement_system(entities, movement_offset):
-    for ent in entities:
-        mov = ent[movement_offset]
-        ent.position[0] += mov.vel_x
-        ent.position[1] += mov.vel_y
+class MoveAction(Action):
+
+    def __init__(self, movement, velocity):
+        self.movement = movement
+        self.velocity = velocity
+
+    def perform(self):
+        self.movement.vel_x, self.movement.vel_y = self.velocity
 
 
-def human_control_system(entities, human_control_offset, movement_offset):
-    for ent in entities:
-        ctrl = ent[human_control_offset]
-        mov = ent[movement_offset]
-        mov.vel_x = mov.vel_y = 0
-        up, down, left, right = CONTROLS_MAP[ctrl.gamepad]
-        if ray.is_key_down(up):
-            mov.vel_y -= 1
-        if ray.is_key_down(down):
-            mov.vel_y += 1
-        if ray.is_key_down(left):
-            mov.vel_x -= 1
-        if ray.is_key_down(right):
-            mov.vel_x += 1
+class LooksLikeHuman:
+    parent: Entity
+    body: Sprite
+    left_hand: Optional[Item]
+    right_hand: Optional[Item]
+    items: List[Item]
+
+    def __init__(self, parent: Entity, body: Sprite):
+        self.parent = parent
+        self.body = body
+        self.right_hand = None
+        self.left_hand = None
+        self.items = []
+
+    def draw(self):
+        x, y = self.parent.x, self.parent.y
+
+        draw_sprite(self.body, (x, y))
+
+        if self.left_hand is not None:
+            draw_sprite(self.left_hand.sprite, (x - 2, y + 3))
+
+        if self.right_hand is not None:
+            draw_sprite(self.right_hand.sprite, (x + 9, y + 4))
 
 
-def npc_control_system(entities, movement_offset, npc_control_offset):
-    for ent in entities:
-        ctrl = ent[npc_control_offset]
-        mov = ent[movement_offset]
-        mov.vel_x = 1
+@dataclass
+class WieldItemAction(Action):
+
+    humanoid: LooksLikeHuman
+    item: Item
+
+    def perform(self):
+        if self.item.body_part is Item.BodyPart.LEFT_HAND:
+            self.humanoid.left_hand = self.item
+        elif self.item.body_part is Item.BodyPart.RIGHT_HAND:
+            self.humanoid.right_hand = self.item
+
+        self.humanoid.items.append(self.item)
 
 
-def physics_system(entities, movement_offset, body_offset):
-    for ent in entities:
-        mov = ent[movement_offset]
-        body = ent[body_offset]
-        if body.mass > 0:
-            mov.vel_y = 2
+@dataclass
+class RemoveItemAction(Action):
+
+    humanoid: LooksLikeHuman
+    item: Item
+
+    def perform(self):
+        if self.item.body_part is Item.BodyPart.LEFT_HAND:
+            self.humanoid.left_hand = None
+        elif self.item.body_part is Item.BodyPart.RIGHT_HAND:
+            self.humanoid.right_hand = None
+
+        self.humanoid.items.remove(self.item)
 
 
-def collision_system(entities, collideable_offset):
-    for ent in entities:
-        key = id(ent)
-        if key not in COLLIDEABLES and ent.state is not Entity.State.DISABLED:
-            COLLIDEABLES[key] = (ent, ent[collideable_offset])
-        elif COLLIDEABLES[key][0].state is Entity.State.DISABLED:
-            COLLIDEABLES.pop(key)
+class Player(Entity):
 
-    for _, col in COLLIDEABLES.values():
-        col.collided_with = None
+    def __init__(self, position, body, gamepad):
+        super().__init__(position)
+        self.gamepad = gamepad
+        self.humanoid = LooksLikeHuman(self, body)
+        self.collider = Collider(self, 16)
+        self.movement = Movement(self, 0, 0)
 
-    ids = COLLIDEABLES.keys()
-    for ent_id in ids:
-        ent, col = COLLIDEABLES[ent_id]
-        x0, y0 = ent.position
+        add_collider(self.collider)
+        add_movement_component(self.movement)
+
+    def tick(self) -> Sequence[Action]:
+        actions = [self._handle_input()]
+
+        self.humanoid.draw()
+
+        return actions
+
+    def _handle_input(self) -> Action:
+        vel_x, vel_y = 0, 0
+        up, down, left, right = CONTROLS_MAP[self.gamepad]
+        if up in PRESSED_KEYS:
+            vel_y -= 1
+        if down in PRESSED_KEYS:
+            vel_y += 1
+        if left in PRESSED_KEYS:
+            vel_x -= 1
+        if right in PRESSED_KEYS:
+            vel_x += 1
+
+        return MoveAction(self.movement, (vel_x, vel_y))
+
+
+class Pickup(Entity):
+
+    def __init__(self, position: Tuple[int, int], item: Item):
+        super().__init__(position)
+        self.item = item
+        self.collider = Collider(self, 16)
+
+        add_collider(self.collider)
+
+    def tick(self) -> Action:
+        draw_sprite(self.item.sprite, (self.x, self.y))
+
+        if self.collider.collision is not None and isinstance(self.collider.collision, Player):
+            self.flags |= Entity.Flags.DESTROY
+            target = self.collider.collision
+            return [
+                WieldItemAction(target.humanoid, self.item)
+            ]
+
+        return []
+
+
+def check_collisions():
+    # reset collisions
+    for col in COLLIDERS:
+        col.collision = None
+
+    # check for new ones
+    for col in COLLIDERS:
+        x0, y0 = col.entity.position
         s0 = col.size
 
-        for other_id in ids:
-            if other_id == ent_id:
+        for other in COLLIDERS:
+            if col == other:
                 continue
 
-            other_ent, other_col = COLLIDEABLES[other_id]
-            x1, y1 = other_ent.position
-            s1 = other_col.size
+            x1, y1 = other.entity.x, other.entity.y
+            s1 = other.size
 
             if x0 < x1 + s1 and x0 + s0 > x1 and y0 < y1 + s1 and y0 + s0 > y1:
-                col.collided_with = other_ent
-                other_col.collided_with = ent
+                col.collision = other.entity
+                other.collision = col.entity
 
 
-def pickup_system(entities, humanoid_offset, collideable_offset):
-    for ent in entities:
-        humanoid = ent[humanoid_offset]
-        col = ent[collideable_offset]
-        if col.collided_with is None:
-            continue
-        elif col.collided_with.kind is Entity.Kind.SHIELD:
-            col.collided_with.state = Entity.State.DISABLED
-            humanoid.shield = SHIELD
-        elif ent.kind is Entity.Kind.NPC\
-             and col.collided_with.kind is Entity.Kind.PLAYER\
-             and humanoid.shield is not None:
-            # FIXME: ok, this is the weak point of the system: we explicitly
-            # access specific entity archetype internals
-            player_wield_shield(col.collided_with)
-            humanoid.shield = None
-            ent.state = Entity.State.DISABLED
-
-ITERATIONS = 0
-
-def filter_active(entities):
-    global ITERATIONS
-    for ent in entities:
-        ITERATIONS += 1
-        if ent.state is Entity.State.ENABLED:
-            yield ent
-
-
-systems = [
-    lambda: physics_system(filter_active(rock_entities), 1, 2),
-    lambda: movement_system(filter_active(rock_entities), 1),
-    lambda: sprite_system(filter_active(rock_entities), 0),
-
-    lambda: collision_system(filter_active(pickup_entities), 1),
-    lambda: sprite_system(filter_active(pickup_entities), 0),
-
-    lambda: human_control_system(filter_active(player_entities), 2, 1),
-    lambda: collision_system(filter_active(player_entities), 3),
-    lambda: movement_system(filter_active(player_entities), 1),
-    lambda: pickup_system(filter_active(player_entities), 0, 3),
-    lambda: humanoid_system(filter_active(player_entities), 0),
-
-    lambda: npc_control_system(filter_active(npc_entities), 1, 2),
-    lambda: collision_system(filter_active(npc_entities), 3),
-    lambda: movement_system(filter_active(npc_entities), 1),
-    lambda: pickup_system(filter_active(npc_entities), 0, 3),
-    lambda: humanoid_system(filter_active(npc_entities), 0),
-]
+def apply_movement():
+    for mov in MOVEMENT_COMPONENTS:
+        mov.entity.x += mov.vel_x
+        mov.entity.y += mov.vel_y
 
 
 if __name__ == '__main__':
@@ -266,7 +329,14 @@ if __name__ == '__main__':
     time_acc = 0
     last_update = ray.get_time()
 
-    printed = False
+    shield = Shield()
+    sword = Sword()
+
+    entities = [
+        Player((400, 300), Sprite(CAVE_DUDE), 0),
+        Pickup((200, 80), shield),
+        Pickup((350, 330), sword),
+    ]
 
     while not ray.window_should_close():
         now = ray.get_time()
@@ -274,17 +344,31 @@ if __name__ == '__main__':
         last_update = now
 
         while time_acc >= TIME_STEP:
+            for key in Key:
+                if ray.is_key_pressed(key.value):
+                    PRESSED_KEYS.add(key)
+
+                if ray.is_key_released(key.value) and key in PRESSED_KEYS:
+                    PRESSED_KEYS.remove(key)
+
+            check_collisions()
+            apply_movement()
+
             ray.begin_drawing()
             ray.clear_background(BLACK)
 
-            ITERATIONS = 0
+            DRAW_LIST.clear()
 
-            for system in systems:
-                system()
+            for entity in entities:
+                for action in entity.tick():
+                    action.perform()
+
+            entities = [ent for ent in entities if not ent.flags & Entity.Flags.DESTROY]
+
+            for draw_cmd in DRAW_LIST:
+                ray.draw_texture_rec(sheet, draw_cmd.sprite.frame, draw_cmd.position, WHITE)
+
             time_acc -= TIME_STEP
-
-            if not printed:
-                print('Total entities visited:', ITERATIONS)
 
             ray.end_drawing()
 

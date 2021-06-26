@@ -1,11 +1,14 @@
+import os
 import pathlib
-from dataclasses import dataclass
-from enum import Enum, IntEnum
-from functools import partial
-from typing import Any, List, Optional, Tuple, cast, Sequence
 from abc import ABCMeta, abstractmethod
-from raylib.colors import *
-from raylib.pyray import PyRay
+from dataclasses import dataclass
+from enum import IntEnum
+from typing import List, Optional, Sequence, Tuple
+
+# NOTE: libraylib_shared.dll should be in the project's root!
+os.environ["RAYLIB_BIN_PATH"] = os.getcwd()
+from raylibpy.colors import *
+from raylibpy.spartan import *
 
 
 CAVE_DUDE = (0, 104, 16, 16)
@@ -40,112 +43,185 @@ CONTROLS_MAP = [
 ]
 
 
-COLLIDERS = []
-
-
 PRESSED_KEYS = set()
 
 
-@dataclass
-class Sprite:
-    frame: Rect
-
-
-@dataclass
-class DrawCommand:
-
-    sprite: Sprite
-    position: Tuple[int, int]
-
-
-DRAW_LIST: List[DrawCommand] = []
-
-
-def draw_sprite(sprite: Sprite, position: Tuple[int, int]):
-    DRAW_LIST.append(DrawCommand(sprite, position))
-
-
 class Action(metaclass=ABCMeta):
+    """
+    An object representing an abstract action performed upon entities.
+    """
 
     @abstractmethod
-    def perform(self):
-        pass
+    def perform(self) -> bool:
+        """
+        Perform the action.
+
+        As long as returns `True`, the action will be executed over and over
+        during each tick.
+        """
+        return False
 
 
-class Entity(metaclass=ABCMeta):
+class Actor(metaclass=ABCMeta):
+    """
+    A primary subject of the game world, with it's own behavior and look-n-feel.
 
-    class Flags(IntEnum):
+    An actor is made up of components, that define it's actual capabilities.
+    All interaction with other entities is done via actions.
+    """
 
-        DESTROY = 1
+    class State(IntEnum):
 
-    def __init__(self, position: Tuple[int, int]):
-        self.position = list(position)
-        self.flags = 0
+        INACTIVE = 0
+        ACTIVE = 1
 
-    @property
-    def x(self) -> int:
-        return self.position[0]
-
-    @x.setter
-    def x(self, value):
-        self.position[0] = value
-
-    @property
-    def y(self) -> int:
-        return self.position[1]
-
-    @y.setter
-    def y(self, value):
-        self.position[1] = value
+    def __init__(self, x: int, y: int) -> None:
+        self.x = x
+        self.y = y
+        self.state = Actor.State.ACTIVE
 
     @abstractmethod
     def tick(self) -> Sequence[Action]:
         pass
 
+    def destroy(self) -> None:
+        pass
 
-@dataclass
-class Collider:
 
-    entity: Entity
+class Component:
+    """
+    Component.
+
+    A component is always attached to an actor and its lifetime is bound to
+    actor's lifetime.
+    """
+
+    actor: Actor
+
+    def __init__(self, actor: Actor) -> None:
+        self.actor = actor
+
+    def destroy(self) -> None:
+        pass
+
+
+class ColliderComponent(Component):
     size: int
-    collision: Optional[Entity] = None
+    collision: Optional[Actor] = None
+
+    def __init__(self, actor: Actor, size: int) -> None:
+        super().__init__(actor)
+        self.size = size
+        self.collision = None
+        add_collider(self)
+
+    def destroy(self) -> None:
+        remove_collider(self)
 
 
-def add_collider(collider: Collider):
+COLLIDERS: List[ColliderComponent] = []
+
+
+def add_collider(collider: ColliderComponent):
     COLLIDERS.append(collider)
 
 
-def remove_collider(collider: Collider):
+def remove_collider(collider: ColliderComponent):
     COLLIDERS.remove(collider)
 
 
-@dataclass
-class Movement:
+def check_collisions():
+    # reset collisions
+    for col in COLLIDERS:
+        col.collision = None
 
-    entity: Entity
+    # check for new ones
+    for col in COLLIDERS:
+        x0, y0 = col.actor.x, col.actor.y
+        s0 = col.size
+
+        for other in COLLIDERS:
+            if col == other:
+                continue
+
+            x1, y1 = other.actor.x, other.actor.y
+            s1 = other.size
+
+            if x0 < x1 + s1 and x0 + s0 > x1 and y0 < y1 + s1 and y0 + s0 > y1:
+                col.collision = other.actor
+                other.collision = col.actor
+
+
+class SpriteComponent(Component):
+    frame: Optional[Rect]
+    offset: Tuple[int, int]
+
+    def __init__(self, actor: Actor, frame: Optional[Rect]=None, offset: Tuple[int, int]=(0, 0)) -> None:
+        super().__init__(actor)
+        self.frame = frame
+        self.offset = offset
+        add_sprite_component(self)
+
+    def destroy(self) -> None:
+        remove_sprite_component(self)
+
+
+SPRITE_COMPONENTS: List[SpriteComponent] = []
+
+
+def add_sprite_component(sprite: SpriteComponent):
+    SPRITE_COMPONENTS.append(sprite)
+
+
+def remove_sprite_component(sprite: SpriteComponent):
+    SPRITE_COMPONENTS.remove(sprite)
+
+
+def draw_sprites():
+    for sprite in SPRITE_COMPONENTS:
+        off_x, off_y = sprite.offset
+        position = sprite.actor.x + off_x, sprite.actor.y + off_y
+        draw_texture_rec(sheet, sprite.frame, position, WHITE)
+
+
+class MovementComponent(Component):
     vel_x: int
     vel_y: int
 
+    def __init__(self, actor: Actor) -> None:
+        super().__init__(actor)
+        self.vel_x = 0
+        self.vel_y = 0
+        add_movement_component(self)
 
-MOVEMENT_COMPONENTS = []
+    def destroy(self) -> None:
+        remove_movement_component(self)
 
-def add_movement_component(comp: Movement):
+
+MOVEMENT_COMPONENTS: List[MovementComponent] = []
+
+
+def add_movement_component(comp: MovementComponent):
     MOVEMENT_COMPONENTS.append(comp)
 
 
-def remove_movement_component(comp: Movement):
+def remove_movement_component(comp: MovementComponent):
     MOVEMENT_COMPONENTS.remove(comp)
 
 
+def apply_movement():
+    for mov in MOVEMENT_COMPONENTS:
+        mov.actor.x += mov.vel_x
+        mov.actor.y += mov.vel_y
+
+
 class Item(metaclass=ABCMeta):
+    """
+    Wieldable or equippable game item.
+    """
 
-    class BodyPart(Enum):
-        LEFT_HAND = 'left_hand'
-        RIGHT_HAND = 'right_hand'
-
-    def __init__(self, body_part: BodyPart, sprite: Sprite):
-        self.body_part = body_part
-        self.sprite = sprite
+    def __init__(self, image: Rect):
+        self.image = image
 
     @abstractmethod
     def use(self) -> Action:
@@ -155,7 +231,7 @@ class Item(metaclass=ABCMeta):
 class Shield(Item):
 
     def __init__(self):
-        super().__init__(Item.BodyPart.RIGHT_HAND, Sprite(SHIELD))
+        super().__init__(SHIELD)
 
     def use(self) -> Action:
         pass
@@ -164,98 +240,75 @@ class Shield(Item):
 class Sword(Item):
 
     def __init__(self):
-        super().__init__(Item.BodyPart.LEFT_HAND, Sprite(SWORD))
+        super().__init__(SWORD)
 
     def use(self) -> Action:
         pass
 
 
-class MoveAction(Action):
+class HumanoidComponent(Component):
 
-    def __init__(self, movement, velocity):
-        self.movement = movement
-        self.velocity = velocity
-
-    def perform(self):
-        self.movement.vel_x, self.movement.vel_y = self.velocity
-
-
-class LooksLikeHuman:
-    parent: Entity
-    body: Sprite
-    left_hand: Optional[Item]
-    right_hand: Optional[Item]
-    items: List[Item]
-
-    def __init__(self, parent: Entity, body: Sprite):
-        self.parent = parent
-        self.body = body
+    def __init__(self, actor: Actor, body_frame: Rect):
+        super().__init__(actor)
+        self.body = SpriteComponent(actor, body_frame)
         self.right_hand = None
         self.left_hand = None
-        self.items = []
 
-    def draw(self):
-        x, y = self.parent.x, self.parent.y
+    def wield_item(self, item: Item) -> bool:
+        if self.left_hand is None:
+            self.left_hand = (
+                SpriteComponent(self.actor, item.image, (0, 3)),
+                item)
+        elif self.right_hand is None:
+            self.right_hand = (
+                SpriteComponent(self.actor, item.image, (10, 3)),
+                item)
+        else:
+            print('no free hand for the item!')
+            return False
 
-        draw_sprite(self.body, (x, y))
+        return True
 
+    def destroy(self) -> None:
         if self.left_hand is not None:
-            draw_sprite(self.left_hand.sprite, (x - 2, y + 3))
+            self.left_hand[0].destroy()
 
         if self.right_hand is not None:
-            draw_sprite(self.right_hand.sprite, (x + 9, y + 4))
+            self.right_hand[0].destroy()
+
+        self.body.destroy()
 
 
 @dataclass
 class WieldItemAction(Action):
 
-    humanoid: LooksLikeHuman
+    humanoid: HumanoidComponent
     item: Item
 
     def perform(self):
-        if self.item.body_part is Item.BodyPart.LEFT_HAND:
-            self.humanoid.left_hand = self.item
-        elif self.item.body_part is Item.BodyPart.RIGHT_HAND:
-            self.humanoid.right_hand = self.item
-
-        self.humanoid.items.append(self.item)
+        self.humanoid.wield_item(self.item)
+        return False
 
 
-@dataclass
-class RemoveItemAction(Action):
+class Player(Actor):
 
-    humanoid: LooksLikeHuman
-    item: Item
-
-    def perform(self):
-        if self.item.body_part is Item.BodyPart.LEFT_HAND:
-            self.humanoid.left_hand = None
-        elif self.item.body_part is Item.BodyPart.RIGHT_HAND:
-            self.humanoid.right_hand = None
-
-        self.humanoid.items.remove(self.item)
-
-
-class Player(Entity):
-
-    def __init__(self, position, body, gamepad):
-        super().__init__(position)
+    def __init__(self, position, gamepad, body_frame: Rect):
+        super().__init__(*position)
         self.gamepad = gamepad
-        self.humanoid = LooksLikeHuman(self, body)
-        self.collider = Collider(self, 16)
-        self.movement = Movement(self, 0, 0)
-
-        add_collider(self.collider)
-        add_movement_component(self.movement)
+        self.humanoid = HumanoidComponent(self, body_frame)
+        self.collider = ColliderComponent(self, 16)
+        self.movement = MovementComponent(self)
 
     def tick(self) -> Sequence[Action]:
-        actions = [self._handle_input()]
+        self._handle_input()
+        return []
 
-        self.humanoid.draw()
+    def destroy(self) -> None:
+        self.humanoid.destroy()
+        self.collider.destroy()
+        self.movement.destroy()
 
-        return actions
-
-    def _handle_input(self) -> Action:
+    def _handle_input(self):
         vel_x, vel_y = 0, 0
         up, down, left, right = CONTROLS_MAP[self.gamepad]
         if up in PRESSED_KEYS:
@@ -267,23 +320,21 @@ class Player(Entity):
         if right in PRESSED_KEYS:
             vel_x += 1
 
-        return MoveAction(self.movement, (vel_x, vel_y))
+        self.movement.vel_x = vel_x
+        self.movement.vel_y = vel_y
 
 
-class Pickup(Entity):
+class Pickup(Actor):
 
     def __init__(self, position: Tuple[int, int], item: Item):
-        super().__init__(position)
+        super().__init__(*position)
         self.item = item
-        self.collider = Collider(self, 16)
-
-        add_collider(self.collider)
+        self.collider = ColliderComponent(self, 16)
+        self.sprite = SpriteComponent(self, item.image)
 
     def tick(self) -> Action:
-        draw_sprite(self.item.sprite, (self.x, self.y))
-
         if self.collider.collision is not None and isinstance(self.collider.collision, Player):
-            self.flags |= Entity.Flags.DESTROY
+            self.state = Actor.State.INACTIVE
             target = self.collider.collision
             return [
                 WieldItemAction(target.humanoid, self.item)
@@ -291,85 +342,60 @@ class Pickup(Entity):
 
         return []
 
-
-def check_collisions():
-    # reset collisions
-    for col in COLLIDERS:
-        col.collision = None
-
-    # check for new ones
-    for col in COLLIDERS:
-        x0, y0 = col.entity.position
-        s0 = col.size
-
-        for other in COLLIDERS:
-            if col == other:
-                continue
-
-            x1, y1 = other.entity.x, other.entity.y
-            s1 = other.size
-
-            if x0 < x1 + s1 and x0 + s0 > x1 and y0 < y1 + s1 and y0 + s0 > y1:
-                col.collision = other.entity
-                other.collision = col.entity
-
-
-def apply_movement():
-    for mov in MOVEMENT_COMPONENTS:
-        mov.entity.x += mov.vel_x
-        mov.entity.y += mov.vel_y
+    def destroy(self) -> None:
+        self.collider.destroy()
+        self.sprite.destroy()
 
 
 if __name__ == '__main__':
-    ray = cast(Any, PyRay())
-    ray.init_window(800, 600, "Cave dudes")
+    init_window(800, 600, "Cave dudes")
 
-    sheet = ray.load_texture(str(pathlib.Path('.').joinpath('assets', 'characters_sheet.png')))
+    sheet = load_texture(str(pathlib.Path('.').joinpath('assets', 'characters_sheet.png')))
 
     time_acc = 0
-    last_update = ray.get_time()
+    last_update = get_time()
 
-    shield = Shield()
-    sword = Sword()
-
-    entities = [
-        Player((400, 300), Sprite(CAVE_DUDE), 0),
-        Pickup((200, 80), shield),
-        Pickup((350, 330), sword),
+    # collection of actors
+    actors = [
+        Player((400, 300), 0, CAVE_DUDE),
+        Pickup((200, 80), Shield()),
+        Pickup((350, 330), Sword()),
     ]
 
-    while not ray.window_should_close():
-        now = ray.get_time()
+    # current game actions
+    actions = []
+
+    while not window_should_close():
+        now = get_time()
         time_acc += now - last_update
         last_update = now
 
         while time_acc >= TIME_STEP:
+            time_acc -= TIME_STEP
+
             for key in Key:
-                if ray.is_key_pressed(key.value):
+                if is_key_pressed(key.value):
                     PRESSED_KEYS.add(key)
 
-                if ray.is_key_released(key.value) and key in PRESSED_KEYS:
+                if is_key_released(key.value) and key in PRESSED_KEYS:
                     PRESSED_KEYS.remove(key)
 
             check_collisions()
             apply_movement()
 
-            ray.begin_drawing()
-            ray.clear_background(BLACK)
+            begin_drawing()
+            clear_background(BLACK)
 
-            DRAW_LIST.clear()
+            for actor in actors:
+                actions.extend(actor.tick())
 
-            for entity in entities:
-                for action in entity.tick():
-                    action.perform()
+                if actor.state == Actor.State.INACTIVE:
+                    actor.destroy()
 
-            entities = [ent for ent in entities if not ent.flags & Entity.Flags.DESTROY]
+            actors = [actor for actor in actors if actor.state == Actor.State.ACTIVE]
+            actions = [action for action in actions if action.perform()]
 
-            for draw_cmd in DRAW_LIST:
-                ray.draw_texture_rec(sheet, draw_cmd.sprite.frame, draw_cmd.position, WHITE)
+            draw_sprites()
+            end_drawing()
 
-            time_acc -= TIME_STEP
-
-            ray.end_drawing()
-
-    ray.close_window()
+    close_window()

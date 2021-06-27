@@ -10,6 +10,9 @@ os.environ["RAYLIB_BIN_PATH"] = os.getcwd()
 from raylibpy.colors import *
 from raylibpy.spartan import *
 
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+TIME_STEP = 1 / 60.0
 
 CAVE_DUDE = (0, 104, 16, 16)
 CAVE_BABE = (17, 86, 16, 16)
@@ -17,10 +20,45 @@ ROCK = (567, 23, 16, 16)
 SHIELD = (652, 74, 16, 16)
 SWORD = (748, 123, 5, 10)
 
-TIME_STEP = 1 / 60.0
-
 
 Rect = Tuple[int, int, int, int]
+
+
+class UI:
+
+    def __init__(self) -> None:
+        self.message = None
+        self.message_show_time = None
+
+    def update(self) -> bool:
+        if self.message is not None \
+           and (get_time() - self.message_show_time) > 1.0 \
+           and get_key_pressed() != 0:
+            self.message = None
+            self.message_show_time = None
+
+        if self.message is not None:
+            anchor_x = SCREEN_WIDTH / 2
+            anchor_y = SCREEN_HEIGHT - 150
+            font = get_font_default()
+            tw, th = measure_text_ex(font, self.message, 14.0, 1.0)
+            tx = anchor_x - tw / 2
+            ty = anchor_y - th / 2
+            rx = tx - 10
+            ry = ty - 10
+            rw = tw + 20
+            rh = th + 10
+            draw_rectangle(rx, ry, rw, rh, WHITE)
+            draw_text_ex(font, self.message, (tx, ty), 14.0, 1.0, BLACK)
+            return True
+        return False
+
+    def show_message(self, message: str) -> None:
+        self.message = message
+        self.message_show_time = get_time()
+
+
+g_ui = UI()
 
 
 class Key(IntEnum):
@@ -48,18 +86,18 @@ PRESSED_KEYS = set()
 
 class Action(metaclass=ABCMeta):
     """
-    An object representing an abstract action performed upon entities.
+    An object representing an abstract action performed upon actions.
     """
 
     @abstractmethod
-    def perform(self) -> bool:
+    def __call__(self) -> bool:
         """
         Perform the action.
 
-        As long as returns `True`, the action will be executed over and over
-        during each tick.
+        An action is considered finished its call returns `True`, otherwise, it
+        will be performed again on the next tick.
         """
-        return False
+        return True
 
 
 class Actor(metaclass=ABCMeta):
@@ -67,7 +105,7 @@ class Actor(metaclass=ABCMeta):
     A primary subject of the game world, with it's own behavior and look-n-feel.
 
     An actor is made up of components, that define it's actual capabilities.
-    All interaction with other entities is done via actions.
+    All interaction with other actions is done via actions.
     """
 
     class State(IntEnum):
@@ -285,9 +323,36 @@ class WieldItemAction(Action):
     humanoid: HumanoidComponent
     item: Item
 
-    def perform(self):
+    def __call__(self) -> bool:
         self.humanoid.wield_item(self.item)
-        return False
+        return True
+
+
+class SequenceAction(Action):
+
+    def __init__(self, actions: List[Action]) -> None:
+        super().__init__()
+        self.actions = actions
+
+    def __call__(self) -> bool:
+        while self.actions:
+            if not self.actions[0]():
+                return False
+            self.actions.pop(0)
+
+
+class ShowMessageAction(Action):
+    def __init__(self, message: str) -> None:
+        self.message = message
+        self.shown = False
+
+    def __call__(self) -> bool:
+        if not self.shown:
+            g_ui.show_message(self.message)
+            self.shown = True
+            return False
+
+        return g_ui.message is None
 
 
 class Player(Actor):
@@ -336,9 +401,10 @@ class Pickup(Actor):
         if self.collider.collision is not None and isinstance(self.collider.collision, Player):
             self.state = Actor.State.INACTIVE
             target = self.collider.collision
-            return [
-                WieldItemAction(target.humanoid, self.item)
-            ]
+            return [SequenceAction([
+                ShowMessageAction('It\'s dangerous to go alone!'),
+                WieldItemAction(target.humanoid, self.item),
+            ])]
 
         return []
 
@@ -348,7 +414,7 @@ class Pickup(Actor):
 
 
 if __name__ == '__main__':
-    init_window(800, 600, "Cave dudes")
+    init_window(SCREEN_WIDTH, SCREEN_HEIGHT, "Cave dudes")
 
     sheet = load_texture(str(pathlib.Path('.').joinpath('assets', 'characters_sheet.png')))
 
@@ -373,6 +439,9 @@ if __name__ == '__main__':
         while time_acc >= TIME_STEP:
             time_acc -= TIME_STEP
 
+            begin_drawing()
+            clear_background(BLACK)
+
             for key in Key:
                 if is_key_pressed(key.value):
                     PRESSED_KEYS.add(key)
@@ -380,20 +449,18 @@ if __name__ == '__main__':
                 if is_key_released(key.value) and key in PRESSED_KEYS:
                     PRESSED_KEYS.remove(key)
 
-            check_collisions()
-            apply_movement()
+            if not g_ui.update():
+                check_collisions()
+                apply_movement()
 
-            begin_drawing()
-            clear_background(BLACK)
+                for actor in actors:
+                    actions.extend(actor.tick())
 
-            for actor in actors:
-                actions.extend(actor.tick())
+                    if actor.state == Actor.State.INACTIVE:
+                        actor.destroy()
 
-                if actor.state == Actor.State.INACTIVE:
-                    actor.destroy()
-
-            actors = [actor for actor in actors if actor.state == Actor.State.ACTIVE]
-            actions = [action for action in actions if action.perform()]
+                actors = [actor for actor in actors if actor.state == Actor.State.ACTIVE]
+                actions = [action for action in actions if not action()]
 
             draw_sprites()
             end_drawing()

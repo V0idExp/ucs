@@ -14,3 +14,9 @@ An experiment with compact component systems
     . .venv/Scripts/Activate.ps1
     pip install -r requirements.txt
     pip install deps/raylib_py-3.7.0a0-py3-none-any.whl
+
+# Executing
+
+Ensure you have the virtualenv activated, then just run:
+
+    python src/ucs

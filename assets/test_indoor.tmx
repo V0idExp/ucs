@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.5" tiledversion="1.7.0" orientation="orthogonal" renderorder="right-up" width="100" height="100" tilewidth="16" tileheight="16" infinite="0" nextlayerid="11" nextobjectid="3">
+ <tileset firstgid="1" source="roguelike.tsx"/>
+ <layer id="9" name="ground" width="100" height="100">
+  <data encoding="base64" compression="zlib">
+   eJzt1zEOgCAMBVAGvf+9vIxXME5MtZIIdngv6crwP6ShNQAAAAAAAAAAAAAAAAAA6I49H9a58z63ePQxT3T/sz68mTmy7N+OPr6hj1qiHJ+yHzmHMfqoxT6vL8tW9mvpoxb/cwAAAAAAAAAAAAAAAAAAAAAAAACAf13T/G7I
+  </data>
+ </layer>
+ <layer id="1" name="walls" width="100" height="100">
+  <data encoding="base64" compression="zlib">
+   eJzt08sJgDAUBMBgalX8lCjaVfSqBUS9JAg6A3sMhLdsCAAAAAAAAAAAAAAAAADwP0sTwnyTtXn7h/+SznuP8TpJH9XktrCfaeN1NpupJreFKd6/GWymmpTZQv/QR5fZjD7KKHVHfZShDwAAAAAAAAAAAAAAAAAAAAAAAAAAAAC+7gACGifS
+  </data>
+ </layer>
+ <layer id="10" name="walls_foreground" width="100" height="100">
+  <properties>
+   <property name="foreground" type="bool" value="true"/>
+  </properties>
+  <data encoding="base64" compression="zlib">
+   eJzt1EEKg0AMBdCgZ61UPWKpt6pu1W0YqhsV5T3IavgwJPAjAAAAAAAAAAAAAAAAAAAAALirsYr4pBmq/5lvITNtZNinrSO6NL+N3a7vOdPX5/z36Zplj680e+6RM2/3OEypw3TTdUodppuuU+ow3QQAAAAAAAAAAAAAAAAAAAAAAAAAcJ4ZHAgkKA==
+  </data>
+ </layer>
+ <objectgroup id="6" name="meta">
+  <object id="1" name="entry" x="776.333" y="717">
+   <point/>
+  </object>
+ </objectgroup>
+</map>

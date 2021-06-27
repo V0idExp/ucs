@@ -23,6 +23,8 @@ SWORD = (748, 123, 5, 10)
 
 Rect = Tuple[int, int, int, int]
 Size = Tuple[int, int]
+Pos = Tuple[int, int]
+
 
 class UI:
 
@@ -429,6 +431,42 @@ class Pickup(Actor):
         self.sprite.destroy()
 
 
+
+class DrawCommand(metaclass=ABCMeta):
+
+    order: int
+
+    @abstractmethod
+    def draw(self):
+        pass
+
+
+DRAW_COMMANDS: List[DrawCommand] = []
+
+
+class DrawRectOutlineCommand(DrawCommand):
+
+    def __init__(self, order: int, rect: Rect, color: Color) -> None:
+        self.order = order
+        self.rect = rect
+        self.color = color
+
+    def draw(self):
+        draw_rectangle_lines(*self.rect, self.color)
+
+
+class DrawTextureRectCommand(DrawCommand):
+
+    def __init__(self, order: int, texture: Texture2D, position: Pos, rect: Rect) -> None:
+        self.order = order
+        self.texture = texture
+        self.position = position
+        self.rect = rect
+
+    def draw(self):
+        draw_texture_rec(self.texture, self.rect, self.position, WHITE)
+
+
 class Map:
 
     def __init__(self, filename) -> None:
@@ -481,34 +519,7 @@ class Map:
                     if self.map.images[col] is not None:
                         filename, rect, _ = self.map.images[col]
                         tex = self.textures[filename]
-                        draw_texture_rec(tex, rect, (x_offset, y_offset), WHITE)
-                        dst_rect = (x_offset, y_offset, tile_width, tile_height)
-                        draw_texture_pro(tex, rect, dst_rect, (0, 0), 0, WHITE)
-
-
-class DrawCommand(metaclass=ABCMeta):
-
-    order: int
-
-    @abstractmethod
-    def draw(self):
-        pass
-
-
-DRAW_COMMANDS: List[DrawCommand] = []
-
-
-class DrawRectOutlineCommand(DrawCommand):
-
-    def __init__(self, order: int, rect: Rect, color: Color) -> None:
-        super().__init__()
-        self.order = order
-        self.rect = rect
-        self.color = color
-
-    def draw(self):
-        draw_rectangle_lines(*self.rect, self.color)
-
+                        DRAW_COMMANDS.append(DrawTextureRectCommand(tex, rect, (x_offset, y_offset)))
 
 
 def apply_movement(map):

@@ -86,7 +86,7 @@ PRESSED_KEYS = set()
 
 class Action(metaclass=ABCMeta):
     """
-    An object representing an abstract action performed upon actions.
+    An object representing an abstract action performed by an actor.
     """
 
     @abstractmethod
@@ -94,8 +94,8 @@ class Action(metaclass=ABCMeta):
         """
         Perform the action.
 
-        An action is considered finished its call returns `True`, otherwise, it
-        will be performed again on the next tick.
+        An action is considered finished if this call returns `True`, otherwise,
+        it will be kept and executed over and over again.
         """
         return True
 
@@ -105,7 +105,7 @@ class Actor(metaclass=ABCMeta):
     A primary subject of the game world, with it's own behavior and look-n-feel.
 
     An actor is made up of components, that define it's actual capabilities.
-    All interaction with other actions is done via actions.
+    All interaction with other actors is done via actions.
     """
 
     class State(IntEnum):
@@ -119,8 +119,8 @@ class Actor(metaclass=ABCMeta):
         self.state = Actor.State.ACTIVE
 
     @abstractmethod
-    def tick(self) -> Sequence[Action]:
-        pass
+    def tick(self) -> Optional[Action]:
+        return None
 
     def destroy(self) -> None:
         pass
@@ -364,9 +364,9 @@ class Player(Actor):
         self.collider = ColliderComponent(self, 16)
         self.movement = MovementComponent(self)
 
-    def tick(self) -> Sequence[Action]:
+    def tick(self) -> Optional[Action]:
         self._handle_input()
-        return []
+        return None
 
     def destroy(self) -> None:
         self.humanoid.destroy()
@@ -397,16 +397,16 @@ class Pickup(Actor):
         self.collider = ColliderComponent(self, 16)
         self.sprite = SpriteComponent(self, item.image)
 
-    def tick(self) -> Action:
+    def tick(self) -> Optional[Action]:
         if self.collider.collision is not None and isinstance(self.collider.collision, Player):
             self.state = Actor.State.INACTIVE
             target = self.collider.collision
-            return [SequenceAction([
+            return SequenceAction([
                 ShowMessageAction('It\'s dangerous to go alone!'),
                 WieldItemAction(target.humanoid, self.item),
-            ])]
+            ])
 
-        return []
+        return None
 
     def destroy(self) -> None:
         self.collider.destroy()
@@ -422,14 +422,14 @@ if __name__ == '__main__':
     last_update = get_time()
 
     # collection of actors
-    actors = [
+    actors: List[Actor] = [
         Player((400, 300), 0, CAVE_DUDE),
         Pickup((200, 80), Shield()),
         Pickup((350, 330), Sword()),
     ]
 
     # current game actions
-    actions = []
+    actions: List[Action] = []
 
     while not window_should_close():
         now = get_time()
@@ -454,7 +454,9 @@ if __name__ == '__main__':
                 apply_movement()
 
                 for actor in actors:
-                    actions.extend(actor.tick())
+                    action = actor.tick()  # pylint: disable=assignment-from-none
+                    if action is not None:
+                        actions.append(action)
 
                     if actor.state == Actor.State.INACTIVE:
                         actor.destroy()

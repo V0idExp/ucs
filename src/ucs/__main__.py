@@ -541,7 +541,7 @@ def apply_movement(map):
 if __name__ == '__main__':
     init_window(SCREEN_WIDTH, SCREEN_HEIGHT, "Cave dudes")
 
-    sheet = load_texture(str(pathlib.Path('.').joinpath('assets', 'characters_sheet.png')))
+    sheet = load_texture(str(pathlib.Path('assets', 'characters_sheet.png')))
     map = Map(pathlib.Path('assets', 'sample_indoor.tmx'))
 
     time_acc = 0

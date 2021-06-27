@@ -519,7 +519,8 @@ class Map:
                     if self.map.images[col] is not None:
                         filename, rect, _ = self.map.images[col]
                         tex = self.textures[filename]
-                        DRAW_COMMANDS.append(DrawTextureRectCommand(tex, rect, (x_offset, y_offset)))
+                        DRAW_COMMANDS.append(DrawTextureRectCommand(
+                            r * self.map.width + c, tex, rect, (x_offset, y_offset)))
 
 
 def apply_movement(map):

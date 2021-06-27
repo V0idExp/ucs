@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import List, Optional, Sequence, Tuple
 
-# NOTE: libraylib_shared.dll should be in the project's root!
-os.environ["RAYLIB_BIN_PATH"] = os.getcwd()
 from raylibpy.colors import *
 from raylibpy.spartan import *
 

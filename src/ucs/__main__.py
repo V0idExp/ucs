@@ -225,7 +225,7 @@ def draw_sprites():
     for sprite in SPRITE_COMPONENTS:
         off_x, off_y = sprite.offset
         position = sprite.actor.x + off_x, sprite.actor.y + off_y
-        draw_texture_rec(sheet, sprite.frame, position, WHITE)
+        DRAW_COMMANDS.append(DrawTextureRectCommand(1000, sheet, sprite.frame, position))
 
 
 class MovementComponent(Component):
@@ -457,7 +457,7 @@ class DrawRectOutlineCommand(DrawCommand):
 
 class DrawTextureRectCommand(DrawCommand):
 
-    def __init__(self, order: int, texture: Texture2D, position: Pos, rect: Rect) -> None:
+    def __init__(self, order: int, texture: Texture2D, rect: Rect, position: Pos) -> None:
         self.order = order
         self.texture = texture
         self.position = position
@@ -475,6 +475,11 @@ class Map:
         self.x = 0
         self.y = 0
 
+        self.non_walkable_tiles = {
+            k for k, props in self.map.tile_properties.items()
+            if props.get('type') == 'obstacle'
+        }
+
         try:
             self.entry = self.map.objects_by_name['entry']
         except KeyError:
@@ -489,19 +494,19 @@ class Map:
 
         return load
 
-    def obstacle_at(self, point):
-        collision_layer = self.map.layernames.get('Obstacles')
-        if collision_layer is None:
-            return False
+    def is_walkable_at(self, point) -> bool:
         x, y = point
         x -= self.x
         y -= self.y
         row = int(y // self.map.tilewidth)
         col = int(x // self.map.tileheight)
-        tile = collision_layer.data[row][col]
-        if self.map.images[tile] is not None:
-            return True
-        return False
+        for layer in self.map.layers:
+            if 'meta' in layer.name.lower():
+                continue
+            tile_id = layer.data[row][col]
+            if tile_id in self.non_walkable_tiles:
+                return False
+        return True
 
     def draw(self):
         tile_width = self.map.tilewidth
@@ -539,7 +544,7 @@ def apply_movement(map):
             (x1, y1),
             (x1, y0),
         ]
-        collision = any(map.obstacle_at(point) for point in points)
+        collision = any(not map.is_walkable_at(point) for point in points)
         if not collision:
             mov.actor.x = x
             mov.actor.y = y
@@ -547,14 +552,14 @@ def apply_movement(map):
         else:
             color = RED
 
-        DRAW_COMMANDS.append(DrawRectOutlineCommand(1000, (x0, y0, w, h), color))
+        DRAW_COMMANDS.append(DrawRectOutlineCommand(2000, (x0, y0, w, h), color))
 
 
 if __name__ == '__main__':
     init_window(SCREEN_WIDTH, SCREEN_HEIGHT, "Cave dudes")
 
     sheet = load_texture(str(pathlib.Path('assets', 'characters_sheet.png')))
-    map = Map(pathlib.Path('assets', 'sample_indoor.tmx'))
+    map = Map(pathlib.Path('assets', 'test_indoor.tmx'))
 
     time_acc = 0
     last_update = get_time()
@@ -620,7 +625,7 @@ if __name__ == '__main__':
             map.draw()
             draw_sprites()
 
-            for cmd in DRAW_COMMANDS:
+            for cmd in sorted(DRAW_COMMANDS, key=lambda cmd: cmd.order, reverse=True):
                 cmd.draw()
 
             end_mode2d()

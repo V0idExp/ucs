@@ -612,14 +612,13 @@ if __name__ == '__main__':
     shader_dir = pathlib.Path('assets', 'shaders')
     mask_shader = load_shader(str(shader_dir.joinpath('mask.vs')), str(shader_dir.joinpath('mask.fs')))
     mask_texture_loc = get_shader_location(mask_shader, "texture1")
-    sprity_pos_loc = get_shader_location(mask_shader, "sprityPos")
     sprite_size_loc = get_shader_location(mask_shader, "spriteSize")
     tilemap_size_loc = get_shader_location(mask_shader, "tilemapSize")
     tile_size_loc = get_shader_location(mask_shader, "tileSize")
     set_shader_value_texture(mask_shader, mask_texture_loc, map.foreground_mask_texture)
+    set_shader_value(mask_shader, tilemap_size_loc, struct.pack('=ff', map.map.width, map.map.height), SHADER_UNIFORM_VEC2)
+    set_shader_value(mask_shader, tile_size_loc, struct.pack('=ff', map.map.tilewidth, map.map.tileheight), SHADER_UNIFORM_VEC2)
     set_shader_value(mask_shader, sprite_size_loc, struct.pack('=ff', 16, 16), SHADER_UNIFORM_VEC2)
-    set_shader_value(mask_shader, tilemap_size_loc, struct.pack('=ff', 100, 100), SHADER_UNIFORM_VEC2)
-    set_shader_value(mask_shader, tile_size_loc, struct.pack('=ff', 16, 16), SHADER_UNIFORM_VEC2)
 
     # render stages callbacks as stage => (enter, exit) mapping
     stage_callbacks: Mapping[DrawCommand.Stage, Tuple[Callable, Callable]] = {

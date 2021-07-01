@@ -1,11 +1,14 @@
 import pathlib
+import struct
 from abc import ABCMeta, abstractmethod
+from array import array
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import List, NamedTuple, Optional, Tuple
+from typing import Callable, List, Mapping, NamedTuple, Optional, Sequence, Tuple
 
 import pytmx
 from raylibpy.colors import *
+from raylibpy.consts import PIXELFORMAT_UNCOMPRESSED_GRAYSCALE, SHADER_UNIFORM_VEC2
 from raylibpy.core import Camera2D, Color, Texture2D
 from raylibpy.spartan import *
 
@@ -24,6 +27,12 @@ SWORD = (748, 123, 5, 10)
 Rect = Tuple[int, int, int, int]
 Size = Tuple[int, int]
 Pos = Tuple[int, int]
+
+
+class Tile(NamedTuple):
+
+    tile_id: int
+    rect: Rect
 
 
 class UI:
@@ -219,13 +228,6 @@ def add_sprite_component(sprite: SpriteComponent):
 
 def remove_sprite_component(sprite: SpriteComponent):
     SPRITE_COMPONENTS.remove(sprite)
-
-
-def draw_sprites():
-    for sprite in SPRITE_COMPONENTS:
-        off_x, off_y = sprite.offset
-        position = sprite.actor.x + off_x, sprite.actor.y + off_y
-        DRAW_COMMANDS.append(DrawTextureRectCommand(1000, sheet, sprite.frame, position))
 
 
 class MovementComponent(Component):
@@ -431,10 +433,15 @@ class Pickup(Actor):
         self.sprite.destroy()
 
 
-
 class DrawCommand(metaclass=ABCMeta):
 
+    class Stage(IntEnum):
+
+        DEFAULT = 0
+        MASKED = 1
+
     order: int
+    stage: Stage = Stage.DEFAULT
 
     @abstractmethod
     def draw(self):
@@ -457,11 +464,18 @@ class DrawRectOutlineCommand(DrawCommand):
 
 class DrawTextureRectCommand(DrawCommand):
 
-    def __init__(self, order: int, texture: Texture2D, rect: Rect, position: Pos) -> None:
+    def __init__(
+            self,
+            order: int,
+            texture: Texture2D,
+            rect: Rect,
+            position: Pos,
+            stage: DrawCommand.Stage=DrawCommand.Stage.DEFAULT) -> None:
         self.order = order
         self.texture = texture
         self.position = position
         self.rect = rect
+        self.stage = stage
 
     def draw(self):
         draw_texture_rec(self.texture, self.rect, self.position, WHITE)
@@ -475,15 +489,36 @@ class Map:
         self.x = 0
         self.y = 0
 
+        try:
+            self.entry = self.map.objects_by_name['entry']
+        except KeyError:
+            raise ValueError(f'no entry point defined for map {filename}')
+
         self.non_walkable_tiles = {
             k for k, props in self.map.tile_properties.items()
             if props.get('type') == 'obstacle'
         }
 
-        try:
-            self.entry = self.map.objects_by_name['entry']
-        except KeyError:
-            raise ValueError(f'no entry point defined for map {filename}')
+        # create the mask of foreground tiles on the GPU, for applying silouette
+        # effects on sprites rendered "behind" foreground (walls, etc.)
+        foreground_bitmap = array('B', b'\xff' * self.map.width * self.map.height)
+        for row in range(self.map.height):
+            for col in range(self.map.width):
+                for layer in self.map.layers:
+                    if not layer.properties.get('foreground', False):
+                        continue
+
+                    tile_id = layer.data[row][col]
+                    tile = self.map.images[tile_id]
+                    if tile is not None:
+                        foreground_bitmap[row * self.map.width + col] = 0x10
+
+        img = gen_image_color(self.map.width, self.map.height, BLACK)
+        image_format(img, PIXELFORMAT_UNCOMPRESSED_GRAYSCALE)
+        tex = load_texture_from_image(img)
+        unload_image(img)
+        update_texture(tex, foreground_bitmap.tobytes())
+        self.foreground_mask_texture = tex
 
     def image_loader(self, filename, flags, **kwargs):
         if filename not in self.textures:
@@ -495,18 +530,29 @@ class Map:
         return load
 
     def is_walkable_at(self, point) -> bool:
+        for tile in self.tiles_at(point):
+            if tile.tile_id in self.non_walkable_tiles:
+                return False
+        return True
+
+    def tiles_at(self, point: Tuple[int, int]) -> Sequence[Tile]:
         x, y = point
         x -= self.x
         y -= self.y
         row = int(y // self.map.tilewidth)
         col = int(x // self.map.tileheight)
+        visited = set()
         for layer in self.map.layers:
             if 'meta' in layer.name.lower():
                 continue
             tile_id = layer.data[row][col]
-            if tile_id in self.non_walkable_tiles:
-                return False
-        return True
+            tile = self.map.images[tile_id]
+            if tile is not None and tile_id not in visited:
+                visited.add(tile_id)
+                w, h = tile[1][2:]
+                x0 = self.x + col * self.map.tilewidth
+                y0 = self.y + row * self.map.tileheight
+                yield Tile(tile_id, (x0, y0, w, h))
 
     def draw(self):
         tile_width = self.map.tilewidth
@@ -538,31 +584,54 @@ def apply_movement(map):
         x1 = x0 + w
         y1 = y0 + h
         # top-left, top-right, bottom-left, bottom-right
-        points = [
-            (x0, y0),
-            (x0, y1),
-            (x1, y1),
-            (x1, y0),
-        ]
+        points = [ (x0, y0), (x0, y1), (x1, y1), (x1, y0), ]
         collision = any(not map.is_walkable_at(point) for point in points)
         if not collision:
             mov.actor.x = x
             mov.actor.y = y
-            color = GREEN
-        else:
-            color = RED
 
-        DRAW_COMMANDS.append(DrawRectOutlineCommand(2000, (x0, y0, w, h), color))
+
+def draw_sprites():
+    for sprite in SPRITE_COMPONENTS:
+        off_x, off_y = sprite.offset
+        position = sprite.actor.x + off_x, sprite.actor.y + off_y
+        DRAW_COMMANDS.append(DrawTextureRectCommand(
+            1e6, sheet, sprite.frame, position, DrawCommand.Stage.MASKED))
 
 
 if __name__ == '__main__':
     init_window(SCREEN_WIDTH, SCREEN_HEIGHT, "Cave dudes")
 
+    # load spritesheets
     sheet = load_texture(str(pathlib.Path('assets', 'characters_sheet.png')))
+
+    # load the map
     map = Map(pathlib.Path('assets', 'test_indoor.tmx'))
 
-    time_acc = 0
-    last_update = get_time()
+    # compile and setup the foreground mask shader
+    shader_dir = pathlib.Path('assets', 'shaders')
+    mask_shader = load_shader(str(shader_dir.joinpath('mask.vs')), str(shader_dir.joinpath('mask.fs')))
+    mask_texture_loc = get_shader_location(mask_shader, "texture1")
+    sprity_pos_loc = get_shader_location(mask_shader, "sprityPos")
+    sprite_size_loc = get_shader_location(mask_shader, "spriteSize")
+    tilemap_size_loc = get_shader_location(mask_shader, "tilemapSize")
+    tile_size_loc = get_shader_location(mask_shader, "tileSize")
+    set_shader_value_texture(mask_shader, mask_texture_loc, map.foreground_mask_texture)
+    set_shader_value(mask_shader, sprite_size_loc, struct.pack('=ff', 16, 16), SHADER_UNIFORM_VEC2)
+    set_shader_value(mask_shader, tilemap_size_loc, struct.pack('=ff', 100, 100), SHADER_UNIFORM_VEC2)
+    set_shader_value(mask_shader, tile_size_loc, struct.pack('=ff', 16, 16), SHADER_UNIFORM_VEC2)
+
+    # render stages callbacks as stage => (enter, exit) mapping
+    stage_callbacks: Mapping[DrawCommand.Stage, Tuple[Callable, Callable]] = {
+        DrawCommand.Stage.DEFAULT: (
+            lambda: None,
+            lambda: None,
+        ),
+        DrawCommand.Stage.MASKED: (
+            lambda: begin_shader_mode(mask_shader),
+            lambda: end_shader_mode(),
+        ),
+    }
 
     # collection of actors
     actors: List[Actor] = [
@@ -571,24 +640,33 @@ if __name__ == '__main__':
         # Pickup((350, 330), Sword()),
     ]
 
+    # ensure there's a properly set up camera (by player's CameraComponent)
+    if g_camera is None:
+        raise RuntimeError('at least one entity must have a CameraComponent!')
+
     # current game actions
     actions: List[Action] = []
 
-    if g_camera is None:
-        raise RuntimeError('at elast one entity must have a CameraComponent!')
+    # time vars
+    time_acc = 0
+    last_update = get_time()
 
+    # main loop
     while not window_should_close():
         now = get_time()
         time_acc += now - last_update
         last_update = now
 
+        # fixed-frame time step
         while time_acc >= TIME_STEP:
             time_acc -= TIME_STEP
 
+            # clear the render queue and the screen
+            DRAW_COMMANDS.clear()
             begin_drawing()
             clear_background(BLACK)
-            DRAW_COMMANDS.clear()
 
+            # process input
             for key in Key:
                 if is_key_pressed(key.value):
                     PRESSED_KEYS.add(key)
@@ -596,19 +674,14 @@ if __name__ == '__main__':
                 if is_key_released(key.value) and key in PRESSED_KEYS:
                     PRESSED_KEYS.remove(key)
 
-            # update the UI
+            # update and draw the UI
             g_ui.update()
-
             pause = g_ui.prompt
 
+            # tick actors and update components if not in pause
             if not pause:
                 check_collisions()
                 apply_movement(map)
-
-                # update the camera
-                # TODO: move this into some sort of camera system... although
-                # it's pretty simple
-                g_camera.camera.target = (g_camera.actor.x, g_camera.actor.y)
 
                 for actor in actors:
                     action = actor.tick()  # pylint: disable=assignment-from-none
@@ -621,13 +694,34 @@ if __name__ == '__main__':
                 actors = [actor for actor in actors if actor.state == Actor.State.ACTIVE]
                 actions = [action for action in actions if not action()]
 
-            begin_mode2d(g_camera.camera)
+            # draw the graphics
             map.draw()
             draw_sprites()
 
-            for cmd in sorted(DRAW_COMMANDS, key=lambda cmd: cmd.order, reverse=True):
-                cmd.draw()
+            # update the camera
+            # TODO: move this into some sort of camera system... although
+            # it's pretty simple
+            g_camera.camera.target = (g_camera.actor.x, g_camera.actor.y)
 
+            # TODO: without this the texture is unavailable for the shader,
+            # probably, because the texture is not bound to the sampler
+            # https://www.khronos.org/opengl/wiki/Sampler_(GLSL)#Binding_textures_to_samplers
+            draw_texture(map.foreground_mask_texture, 0, 0, BLACK)
+
+            # execute drawing commands, scheduled during the update
+            begin_mode2d(g_camera.camera)
+            current_stage = None
+            for cmd in sorted(DRAW_COMMANDS, key=lambda cmd: (cmd.stage, cmd.order)):
+                if current_stage != cmd.stage:
+                    # exit current stage
+                    if current_stage is not None:
+                        stage_callbacks[current_stage][1]()
+                    # enter next stage
+                    current_stage = cmd.stage
+                    stage_callbacks[current_stage][0]()
+                cmd.draw()
+            if current_stage is not None:
+                stage_callbacks[current_stage][1]()
             end_mode2d()
             end_drawing()
 

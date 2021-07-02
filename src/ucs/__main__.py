@@ -4,13 +4,18 @@ from abc import ABCMeta, abstractmethod
 from array import array
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Callable, List, Mapping, NamedTuple, Optional, Sequence, Tuple
+from typing import (Callable, List, Mapping, NamedTuple, Optional, Sequence,
+                    Tuple)
 
 import pytmx
 from raylibpy.colors import *
-from raylibpy.consts import PIXELFORMAT_UNCOMPRESSED_GRAYSCALE, SHADER_UNIFORM_VEC2
+from raylibpy.consts import (PIXELFORMAT_UNCOMPRESSED_GRAYSCALE,
+                             SHADER_UNIFORM_VEC2)
 from raylibpy.core import Camera2D, Color, Texture2D
 from raylibpy.spartan import *
+
+from ucs.ui import UI
+
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
@@ -35,45 +40,7 @@ class Tile(NamedTuple):
     rect: Rect
 
 
-class UI:
-
-    prompt: bool = False  # is the UI currently waiting for prompt
-
-    def __init__(self) -> None:
-        self.message = None
-        self.message_show_time = None
-        self.prompt = False
-
-    def update(self):
-        if self.message is not None \
-           and (get_time() - self.message_show_time) > 1.0 \
-           and get_key_pressed() != 0:
-            self.message = None
-            self.message_show_time = None
-
-        if self.message is not None:
-            anchor_x = SCREEN_WIDTH / 2
-            anchor_y = SCREEN_HEIGHT - 150
-            font = get_font_default()
-            tw, th = measure_text_ex(font, self.message, 14.0, 1.0)
-            tx = anchor_x - tw / 2
-            ty = anchor_y - th / 2
-            rx = tx - 10
-            ry = ty - 10
-            rw = tw + 20
-            rh = th + 10
-            draw_rectangle(rx, ry, rw, rh, WHITE)
-            draw_text_ex(font, self.message, (tx, ty), 14.0, 1.0, BLACK)
-            self.prompt = True
-        else:
-            self.prompt = False
-
-    def show_message(self, message: str) -> None:
-        self.message = message
-        self.message_show_time = get_time()
-
-
-g_ui = UI()
+g_ui = UI(SCREEN_WIDTH, SCREEN_HEIGHT)
 
 
 class Key(IntEnum):

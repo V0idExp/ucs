@@ -1,21 +1,23 @@
 import pathlib
-import struct
 from abc import ABCMeta, abstractmethod
-from array import array
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import (Callable, List, Mapping, NamedTuple, Optional, Sequence,
-                    Tuple)
+from typing import List, Optional, Tuple
 
-import pytmx
-from raylibpy.colors import *
-from raylibpy.consts import (PIXELFORMAT_UNCOMPRESSED_GRAYSCALE,
-                             SHADER_UNIFORM_VEC2)
-from raylibpy.core import Camera2D, Color, Texture2D
-from raylibpy.spartan import *
+from raylibpy.spartan import (close_window, get_time, is_key_pressed,
+                              is_key_released, window_should_close)
 
+from ucs.components.collision import (CollisionComponent,
+                                      collider_system_update,
+                                      collision_system_init)
+from ucs.components.movement import (MovementComponent, movement_system_init,
+                                     movement_system_update)
+from ucs.components.sprite import (SpriteComponent, sprite_system_init,
+                                   sprite_system_update)
+from ucs.foundation import Action, Actor, Component, Rect
+from ucs.gfx import get_camera, gfx_frame, gfx_init, gfx_set_map_params
+from ucs.tilemap import TileMap
 from ucs.ui import UI
-
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
@@ -27,20 +29,6 @@ CAVE_BABE = (17, 86, 16, 16)
 ROCK = (567, 23, 16, 16)
 SHIELD = (652, 74, 16, 16)
 SWORD = (748, 123, 5, 10)
-
-
-Rect = Tuple[int, int, int, int]
-Size = Tuple[int, int]
-Pos = Tuple[int, int]
-
-
-class Tile(NamedTuple):
-
-    tile_id: int
-    rect: Rect
-
-
-g_ui = UI(SCREEN_WIDTH, SCREEN_HEIGHT)
 
 
 class Key(IntEnum):
@@ -66,176 +54,7 @@ CONTROLS_MAP = [
 PRESSED_KEYS = set()
 
 
-class Action(metaclass=ABCMeta):
-    """
-    An object representing an abstract action performed by an actor.
-    """
-
-    @abstractmethod
-    def __call__(self) -> bool:
-        """
-        Perform the action.
-
-        An action is considered finished if this call returns `True`, otherwise,
-        it will be kept and executed over and over again.
-        """
-        return True
-
-
-class Actor(metaclass=ABCMeta):
-    """
-    A primary subject of the game world, with it's own behavior and look-n-feel.
-
-    An actor is made up of components, that define it's actual capabilities.
-    All interaction with other actors is done via actions.
-    """
-
-    class State(IntEnum):
-
-        INACTIVE = 0
-        ACTIVE = 1
-
-    def __init__(self, x: int, y: int) -> None:
-        self.x = x
-        self.y = y
-        self.state = Actor.State.ACTIVE
-
-    @abstractmethod
-    def tick(self) -> Optional[Action]:
-        return None
-
-    def destroy(self) -> None:
-        pass
-
-
-class Component:
-    """
-    Component.
-
-    A component is always attached to an actor and its lifetime is bound to
-    actor's lifetime.
-    """
-
-    actor: Actor
-
-    def __init__(self, actor: Actor) -> None:
-        self.actor = actor
-
-    def destroy(self) -> None:
-        pass
-
-
-class ColliderComponent(Component):
-    size: int
-    collision: Optional[Actor] = None
-
-    def __init__(self, actor: Actor, size: int) -> None:
-        super().__init__(actor)
-        self.size = size
-        self.collision = None
-        add_collider(self)
-
-    def destroy(self) -> None:
-        remove_collider(self)
-
-
-COLLIDERS: List[ColliderComponent] = []
-
-
-def add_collider(collider: ColliderComponent):
-    COLLIDERS.append(collider)
-
-
-def remove_collider(collider: ColliderComponent):
-    COLLIDERS.remove(collider)
-
-
-def check_collisions():
-    # reset collisions
-    for col in COLLIDERS:
-        col.collision = None
-
-    # check for new ones
-    for col in COLLIDERS:
-        x0, y0 = col.actor.x, col.actor.y
-        s0 = col.size
-
-        for other in COLLIDERS:
-            if col == other:
-                continue
-
-            x1, y1 = other.actor.x, other.actor.y
-            s1 = other.size
-
-            if x0 < x1 + s1 and x0 + s0 > x1 and y0 < y1 + s1 and y0 + s0 > y1:
-                col.collision = other.actor
-                other.collision = col.actor
-
-
-class SpriteComponent(Component):
-    frame: Optional[Rect]
-    offset: Tuple[int, int]
-
-    def __init__(self, actor: Actor, frame: Optional[Rect]=None, offset: Tuple[int, int]=(0, 0)) -> None:
-        super().__init__(actor)
-        self.frame = frame
-        self.offset = offset
-        add_sprite_component(self)
-
-    def destroy(self) -> None:
-        remove_sprite_component(self)
-
-
-SPRITE_COMPONENTS: List[SpriteComponent] = []
-
-
-def add_sprite_component(sprite: SpriteComponent):
-    SPRITE_COMPONENTS.append(sprite)
-
-
-def remove_sprite_component(sprite: SpriteComponent):
-    SPRITE_COMPONENTS.remove(sprite)
-
-
-class MovementComponent(Component):
-    vel_x: int
-    vel_y: int
-    rect: Rect
-
-    def __init__(self, actor: Actor, rect: Rect) -> None:
-        super().__init__(actor)
-        self.vel_x = 0
-        self.vel_y = 0
-        self.rect = rect
-        add_movement_component(self)
-
-    def destroy(self) -> None:
-        remove_movement_component(self)
-
-
-g_camera = None
-
-
-class CameraComponent(Component):
-
-    def __init__(self, actor: Actor) -> None:
-        global g_camera
-        if g_camera is not None:
-            raise RuntimeError('only one camera component is allowed at a time')
-        super().__init__(actor)
-        self.camera = Camera2D(offset=(SCREEN_WIDTH / 2 - 16, SCREEN_HEIGHT / 2 - 16), zoom=DRAW_SCALE)
-        g_camera = self
-
-
-MOVEMENT_COMPONENTS: List[MovementComponent] = []
-
-
-def add_movement_component(comp: MovementComponent):
-    MOVEMENT_COMPONENTS.append(comp)
-
-
-def remove_movement_component(comp: MovementComponent):
-    MOVEMENT_COMPONENTS.remove(comp)
+g_ui: UI = None
 
 
 class Item(metaclass=ABCMeta):
@@ -347,9 +166,8 @@ class Player(Actor):
         super().__init__(*position)
         self.gamepad = gamepad
         self.humanoid = HumanoidComponent(self, body_frame)
-        self.collider = ColliderComponent(self, 16)
+        self.collider = CollisionComponent(self, 16)
         self.movement = MovementComponent(self, (-8, 0, 16, 8))
-        self.camera = CameraComponent(self)
 
     def tick(self) -> Optional[Action]:
         self._handle_input()
@@ -381,7 +199,7 @@ class Pickup(Actor):
     def __init__(self, position: Tuple[int, int], item: Item):
         super().__init__(*position)
         self.item = item
-        self.collider = ColliderComponent(self, 16)
+        self.collider = CollisionComponent(self, 16)
         self.sprite = SpriteComponent(self, item.image)
 
     def tick(self) -> Optional[Action]:
@@ -400,215 +218,30 @@ class Pickup(Actor):
         self.sprite.destroy()
 
 
-class DrawCommand(metaclass=ABCMeta):
-
-    class Stage(IntEnum):
-
-        DEFAULT = 0
-        MASKED = 1
-
-    order: int
-    stage: Stage = Stage.DEFAULT
-
-    @abstractmethod
-    def draw(self):
-        pass
-
-
-DRAW_COMMANDS: List[DrawCommand] = []
-
-
-class DrawRectOutlineCommand(DrawCommand):
-
-    def __init__(self, order: int, rect: Rect, color: Color) -> None:
-        self.order = order
-        self.rect = rect
-        self.color = color
-
-    def draw(self):
-        draw_rectangle_lines(*self.rect, self.color)
-
-
-class DrawTextureRectCommand(DrawCommand):
-
-    def __init__(
-            self,
-            order: int,
-            texture: Texture2D,
-            rect: Rect,
-            position: Pos,
-            stage: DrawCommand.Stage=DrawCommand.Stage.DEFAULT) -> None:
-        self.order = order
-        self.texture = texture
-        self.position = position
-        self.rect = rect
-        self.stage = stage
-
-    def draw(self):
-        draw_texture_rec(self.texture, self.rect, self.position, WHITE)
-
-
-class Map:
-
-    def __init__(self, filename) -> None:
-        self.textures = {}
-        self.map = pytmx.TiledMap(filename, self.image_loader)
-        self.x = 0
-        self.y = 0
-
-        try:
-            self.entry = self.map.objects_by_name['entry']
-        except KeyError:
-            raise ValueError(f'no entry point defined for map {filename}')
-
-        self.non_walkable_tiles = {
-            k for k, props in self.map.tile_properties.items()
-            if props.get('type') == 'obstacle'
-        }
-
-        # create the mask of foreground tiles on the GPU, for applying silouette
-        # effects on sprites rendered "behind" foreground (walls, etc.)
-        foreground_bitmap = array('B', b'\xff' * self.map.width * self.map.height)
-        for row in range(self.map.height):
-            for col in range(self.map.width):
-                for layer in self.map.layers:
-                    if not layer.properties.get('foreground', False):
-                        continue
-
-                    tile_id = layer.data[row][col]
-                    tile = self.map.images[tile_id]
-                    if tile is not None:
-                        foreground_bitmap[row * self.map.width + col] = 0x10
-
-        img = gen_image_color(self.map.width, self.map.height, BLACK)
-        image_format(img, PIXELFORMAT_UNCOMPRESSED_GRAYSCALE)
-        tex = load_texture_from_image(img)
-        unload_image(img)
-        update_texture(tex, foreground_bitmap.tobytes())
-        self.foreground_mask_texture = tex
-
-    def image_loader(self, filename, flags, **kwargs):
-        if filename not in self.textures:
-            self.textures[filename] = load_texture(filename)
-
-        def load(rect=None, flags=None):
-            return filename, rect, flags
-
-        return load
-
-    def is_walkable_at(self, point) -> bool:
-        for tile in self.tiles_at(point):
-            if tile.tile_id in self.non_walkable_tiles:
-                return False
-        return True
-
-    def tiles_at(self, point: Tuple[int, int]) -> Sequence[Tile]:
-        x, y = point
-        x -= self.x
-        y -= self.y
-        row = int(y // self.map.tilewidth)
-        col = int(x // self.map.tileheight)
-        visited = set()
-        for layer in self.map.layers:
-            if 'meta' in layer.name.lower():
-                continue
-            tile_id = layer.data[row][col]
-            tile = self.map.images[tile_id]
-            if tile is not None and tile_id not in visited:
-                visited.add(tile_id)
-                w, h = tile[1][2:]
-                x0 = self.x + col * self.map.tilewidth
-                y0 = self.y + row * self.map.tileheight
-                yield Tile(tile_id, (x0, y0, w, h))
-
-    def draw(self):
-        tile_width = self.map.tilewidth
-        tile_height = self.map.tileheight
-
-        for layer in self.map.layers:
-            name = layer.name.lower()
-            if any(skip in name for skip in ('meta', 'obstacles')):
-                continue
-
-            for r, row in enumerate(layer.data):
-                y_offset = self.y + r * tile_width
-                for c, col in enumerate(row):
-                    x_offset = self.x + c * tile_height
-                    if self.map.images[col] is not None:
-                        filename, rect, _ = self.map.images[col]
-                        tex = self.textures[filename]
-                        DRAW_COMMANDS.append(DrawTextureRectCommand(
-                            r * self.map.width + c, tex, rect, (x_offset, y_offset)))
-
-
-def apply_movement(map):
-    for mov in MOVEMENT_COMPONENTS:
-        x = mov.actor.x + mov.vel_x
-        y = mov.actor.y + mov.vel_y
-        x0, y0, w, h = mov.rect
-        x0 += x
-        y0 += y
-        x1 = x0 + w
-        y1 = y0 + h
-        # top-left, top-right, bottom-left, bottom-right
-        points = [ (x0, y0), (x0, y1), (x1, y1), (x1, y0), ]
-        collision = any(not map.is_walkable_at(point) for point in points)
-        if not collision:
-            mov.actor.x = x
-            mov.actor.y = y
-
-
-def draw_sprites():
-    for sprite in SPRITE_COMPONENTS:
-        off_x, off_y = sprite.offset
-        position = sprite.actor.x + off_x, sprite.actor.y + off_y
-        DRAW_COMMANDS.append(DrawTextureRectCommand(
-            1e6, sheet, sprite.frame, position, DrawCommand.Stage.MASKED))
-
-
 if __name__ == '__main__':
-    init_window(SCREEN_WIDTH, SCREEN_HEIGHT, "Cave dudes")
-
-    # load spritesheets
-    sheet = load_texture(str(pathlib.Path('assets', 'characters_sheet.png')))
+    gfx_init("Cave dudes", (SCREEN_WIDTH, SCREEN_HEIGHT), DRAW_SCALE)
+    sprite_system_init()
+    movement_system_init()
+    collision_system_init()
 
     # load the map
-    map = Map(pathlib.Path('assets', 'test_indoor.tmx'))
+    tilemap = TileMap(pathlib.Path('assets', 'test_indoor.tmx'))
 
-    # compile and setup the foreground mask shader
-    shader_dir = pathlib.Path('assets', 'shaders')
-    mask_shader = load_shader(str(shader_dir.joinpath('mask.vs')), str(shader_dir.joinpath('mask.fs')))
-    mask_texture_loc = get_shader_location(mask_shader, "texture1")
-    sprite_size_loc = get_shader_location(mask_shader, "spriteSize")
-    tilemap_size_loc = get_shader_location(mask_shader, "tilemapSize")
-    tile_size_loc = get_shader_location(mask_shader, "tileSize")
-    set_shader_value_texture(mask_shader, mask_texture_loc, map.foreground_mask_texture)
-    set_shader_value(mask_shader, tilemap_size_loc, struct.pack('=ff', map.map.width, map.map.height), SHADER_UNIFORM_VEC2)
-    set_shader_value(mask_shader, tile_size_loc, struct.pack('=ff', map.map.tilewidth, map.map.tileheight), SHADER_UNIFORM_VEC2)
-    set_shader_value(mask_shader, sprite_size_loc, struct.pack('=ff', 16, 16), SHADER_UNIFORM_VEC2)
+    gfx_set_map_params(
+        tilemap.foreground_mask_texture,
+        (tilemap.map.tilewidth, tilemap.map.tileheight),
+        (tilemap.map.width, tilemap.map.height))
 
-    # render stages callbacks as stage => (enter, exit) mapping
-    stage_callbacks: Mapping[DrawCommand.Stage, Tuple[Callable, Callable]] = {
-        DrawCommand.Stage.DEFAULT: (
-            lambda: None,
-            lambda: None,
-        ),
-        DrawCommand.Stage.MASKED: (
-            lambda: begin_shader_mode(mask_shader),
-            lambda: end_shader_mode(),
-        ),
-    }
+    player = Player((tilemap.entry.x, tilemap.entry.y), 0, CAVE_DUDE)
+    camera = get_camera()
+    camera.offset = (SCREEN_WIDTH / 2 - 8, SCREEN_HEIGHT / 2 - 8)
 
     # collection of actors
     actors: List[Actor] = [
-        Player((map.entry.x, map.entry.y), 0, CAVE_DUDE),
+        player,
         # Pickup((200, 80), Shield()),
         # Pickup((350, 330), Sword()),
     ]
-
-    # ensure there's a properly set up camera (by player's CameraComponent)
-    if g_camera is None:
-        raise RuntimeError('at least one entity must have a CameraComponent!')
 
     # current game actions
     actions: List[Action] = []
@@ -627,11 +260,6 @@ if __name__ == '__main__':
         while time_acc >= TIME_STEP:
             time_acc -= TIME_STEP
 
-            # clear the render queue and the screen
-            DRAW_COMMANDS.clear()
-            begin_drawing()
-            clear_background(BLACK)
-
             # process input
             for key in Key:
                 if is_key_pressed(key.value):
@@ -641,13 +269,14 @@ if __name__ == '__main__':
                     PRESSED_KEYS.remove(key)
 
             # update and draw the UI
-            g_ui.update()
-            pause = g_ui.prompt
+            # FIXME: g_ui.update()
+            # FIXME: pause = g_ui.prompt
 
             # tick actors and update components if not in pause
-            if not pause:
-                check_collisions()
-                apply_movement(map)
+            # FIXME: if not pause:
+            if True:
+                collider_system_update()
+                movement_system_update(tilemap)
 
                 for actor in actors:
                     action = actor.tick()  # pylint: disable=assignment-from-none
@@ -660,35 +289,9 @@ if __name__ == '__main__':
                 actors = [actor for actor in actors if actor.state == Actor.State.ACTIVE]
                 actions = [action for action in actions if not action()]
 
-            # draw the graphics
-            map.draw()
-            draw_sprites()
-
-            # update the camera
-            # TODO: move this into some sort of camera system... although
-            # it's pretty simple
-            g_camera.camera.target = (g_camera.actor.x, g_camera.actor.y)
-
-            # TODO: without this the texture is unavailable for the shader,
-            # probably, because the texture is not bound to the sampler
-            # https://www.khronos.org/opengl/wiki/Sampler_(GLSL)#Binding_textures_to_samplers
-            draw_texture(map.foreground_mask_texture, 0, 0, BLACK)
-
-            # execute drawing commands, scheduled during the update
-            begin_mode2d(g_camera.camera)
-            current_stage = None
-            for cmd in sorted(DRAW_COMMANDS, key=lambda cmd: (cmd.stage, cmd.order)):
-                if current_stage != cmd.stage:
-                    # exit current stage
-                    if current_stage is not None:
-                        stage_callbacks[current_stage][1]()
-                    # enter next stage
-                    current_stage = cmd.stage
-                    stage_callbacks[current_stage][0]()
-                cmd.draw()
-            if current_stage is not None:
-                stage_callbacks[current_stage][1]()
-            end_mode2d()
-            end_drawing()
+            with gfx_frame() as ctx:
+                camera.target = player.position
+                tilemap.draw(ctx)
+                sprite_system_update(ctx)
 
     close_window()

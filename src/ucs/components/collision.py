@@ -25,7 +25,7 @@ def collision_system_init():
     _colliders = []
 
 
-def collider_system_update():
+def collision_system_update():
     # reset collisions
     for col in _colliders:
         col.collision = None

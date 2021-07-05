@@ -71,6 +71,11 @@ class MaskedRenderStage(RenderStage):
 
     def set_sprite_size(self, size: Size):
         self.sprite_size = size
+        set_shader_value(
+            self.shader,
+            self.sprite_size_loc,
+            struct.pack('=ff', *self.sprite_size),
+            SHADER_UNIFORM_VEC2)
 
     def enter(self):
         begin_mode2d(_camera)
@@ -86,11 +91,7 @@ class MaskedRenderStage(RenderStage):
             self.tile_size_loc,
             struct.pack('=ff', *self.tile_size),
             SHADER_UNIFORM_VEC2)
-        set_shader_value(
-            self.shader,
-            self.sprite_size_loc,
-            struct.pack('=ff', *self.sprite_size),
-            SHADER_UNIFORM_VEC2)
+
 
     def exit(self):
         end_shader_mode()

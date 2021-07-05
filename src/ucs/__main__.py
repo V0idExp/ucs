@@ -8,7 +8,7 @@ from raylibpy.spartan import (close_window, get_time, is_key_pressed,
                               is_key_released, window_should_close)
 
 from ucs.components.collision import (CollisionComponent,
-                                      collider_system_update,
+                                      collision_system_update,
                                       collision_system_init)
 from ucs.components.movement import (MovementComponent, movement_system_init,
                                      movement_system_update)
@@ -275,7 +275,7 @@ if __name__ == '__main__':
             # tick actors and update components if not in pause
             # FIXME: if not pause:
             if True:
-                collider_system_update()
+                collision_system_update()
                 movement_system_update(tilemap)
 
                 for actor in actors:
@@ -289,8 +289,9 @@ if __name__ == '__main__':
                 actors = [actor for actor in actors if actor.state == Actor.State.ACTIVE]
                 actions = [action for action in actions if not action()]
 
-            with gfx_frame() as ctx:
                 camera.target = player.position
+
+            with gfx_frame() as ctx:
                 tilemap.draw(ctx)
                 sprite_system_update(ctx)
 

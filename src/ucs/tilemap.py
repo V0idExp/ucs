@@ -7,7 +7,7 @@ from raylibpy.spartan import (gen_image_color, image_draw_pixel, image_format,
                               load_texture, load_texture_from_image,
                               unload_image)
 
-from ucs.foundation import Pos, Rect
+from ucs.foundation import Position, Rect
 from ucs.gfx import DrawTextureRectCommand, RenderContext
 
 
@@ -59,7 +59,7 @@ class TileMap:
                 return False
         return True
 
-    def tiles_at(self, point: Pos) -> Sequence[Tile]:
+    def tiles_at(self, point: Position) -> Sequence[Tile]:
         x, y = point
         x -= self.x
         y -= self.y

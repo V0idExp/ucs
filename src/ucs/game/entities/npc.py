@@ -1,4 +1,4 @@
-from ucs.foundation import Action, Actor, Rect, Pos
+from ucs.foundation import Action, Actor, Rect, Position
 from typing import Optional
 
 from ucs.game.components import HumanoidComponent
@@ -13,7 +13,7 @@ class NPCBehavior:
 
 class NPC(Actor):
 
-    def __init__(self, position: Pos, body_frame: Rect, reactions: NPCBehavior):
+    def __init__(self, position: Position, body_frame: Rect, reactions: NPCBehavior):
         super().__init__(*position)
         self.humanoid = HumanoidComponent(self, body_frame)
         self.reactions = reactions

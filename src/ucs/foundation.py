@@ -4,7 +4,8 @@ from typing import Iterable, Optional, Sequence, Tuple
 
 Rect = Tuple[int, int, int, int]
 Size = Tuple[int, int]
-Pos = Tuple[int, int]
+Position = Tuple[int, int]
+Offset = Tuple[int, int]
 
 
 class Action(metaclass=ABCMeta):
@@ -43,7 +44,7 @@ class Actor(metaclass=ABCMeta):
         self.scene: Scene = None
 
     @property
-    def position(self) -> Pos:
+    def position(self) -> Position:
         return (self.x, self.y)
 
     @abstractmethod

@@ -15,7 +15,7 @@ from raylibpy.spartan import (Color, Texture2D, begin_drawing, begin_mode2d,
                               get_shader_location, init_window, load_shader,
                               set_shader_value, set_shader_value_texture)
 
-from ucs.foundation import Pos, Rect, Size
+from ucs.foundation import Position, Rect, Size
 
 _camera: Camera2D = None
 _screen_width: int = 0
@@ -148,7 +148,7 @@ class DrawTextureRectCommand(DrawCommand):
             order: int,
             texture: Texture2D,
             rect: Rect,
-            position: Pos) -> None:
+            position: Position) -> None:
         self.order = order
         self.texture = texture
         self.position = position
@@ -165,7 +165,7 @@ class DrawMaskedTextureRectCommand(DrawCommand):
             order: int,
             texture: Texture2D,
             rect: Rect,
-            position: Pos) -> None:
+            position: Position) -> None:
         self.order = order
         self.texture = texture
         self.position = position

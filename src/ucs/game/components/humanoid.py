@@ -1,6 +1,7 @@
 from ucs.components import SpriteComponent
 from ucs.foundation import Actor, Component, Rect
 from ucs.game.items import Item
+from ucs.game.items.item import BodyPart
 
 
 class HumanoidComponent(Component):
@@ -13,25 +14,21 @@ class HumanoidComponent(Component):
         self.left_hand = None
 
     def wield_item(self, item: Item) -> bool:
-        if self.left_hand is None:
-            self.left_hand = (
-                SpriteComponent(self.actor, item.image, (0, 3)),
-                item)
-        elif self.right_hand is None:
-            self.right_hand = (
-                SpriteComponent(self.actor, item.image, (10, 3)),
-                item)
-        else:
-            print('no free hand for the item!')
-            return False
-
-        return True
+        off_x, off_y = item.equip_offset
+        if item.equip_part is BodyPart.RIGHT_HAND:
+            off_x += 7
+            off_y += 2
+            self.right_hand = SpriteComponent(self.actor, item.image, (off_x, off_y))
+        elif item.equip_part is BodyPart.LEFT_HAND:
+            off_x -= 3
+            off_y += 2
+            self.left_hand = SpriteComponent(self.actor, item.image, (off_x, off_y))
 
     def destroy(self) -> None:
         if self.left_hand is not None:
-            self.left_hand[0].destroy()
+            self.left_hand.destroy()
 
         if self.right_hand is not None:
-            self.right_hand[0].destroy()
+            self.right_hand.destroy()
 
         self.body.destroy()

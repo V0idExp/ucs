@@ -1,4 +1,4 @@
-from ucs.foundation import Action, Actor, Rect, Pos
+from ucs.foundation import Action, Actor, Rect, Position
 from ucs.input import is_key_pressed, PLAYER_CONTROLS_MAP
 from typing import Optional
 
@@ -8,7 +8,7 @@ from ucs.components import CollisionComponent, MovementComponent
 
 class Player(Actor):
 
-    def __init__(self, position: Pos, gamepad: int, body_frame: Rect):
+    def __init__(self, position: Position, gamepad: int, body_frame: Rect):
         super().__init__(*position)
         self.gamepad = gamepad
         self.humanoid = HumanoidComponent(self, body_frame)

@@ -6,6 +6,7 @@ from raylibpy.spartan import close_window, get_time, window_should_close
 from ucs.components.collision import collision_init, collision_update
 from ucs.components.movement import movement_init, movement_update
 from ucs.components.sprite import sprite_init, sprite_update
+from ucs.components.walk import walk_init, walk_update
 from ucs.foundation import Action, Actor, Scene
 from ucs.game.actions import (DestroyActorsAction, SequenceAction,
                               ShowMessageAction, SpawnActorsAction)
@@ -28,15 +29,15 @@ CAVE_WISE = (17, 155, 16, 14)
 ROCK = (567, 23, 16, 16)
 
 
-class CaveWiseLogic(NPCBehavior):
+class CaveNPC(NPCBehavior):
 
     def on_sight(self, npc: Actor, _: Actor) -> Optional[Action]:
         x, y = npc.position
 
         def spawn_pickups():
             return [
-                Pickup((x - 30, y), Shield()),
-                Pickup((x + 20, y), Sword()),
+                Pickup((x - 32, y), Shield()),
+                Pickup((x + 32, y), Sword()),
             ]
 
         return SequenceAction([
@@ -49,6 +50,7 @@ class CaveWiseLogic(NPCBehavior):
 if __name__ == '__main__':
     gfx_init("Cave dudes", (SCREEN_WIDTH, SCREEN_HEIGHT), DRAW_SCALE)
     ui_init(SCREEN_WIDTH, SCREEN_HEIGHT)
+    walk_init()
     sprite_init()
     movement_init()
     collision_init()
@@ -61,14 +63,14 @@ if __name__ == '__main__':
         (tilemap.map.tilewidth, tilemap.map.tileheight),
         (tilemap.map.width, tilemap.map.height))
 
-    player = Player((tilemap.entry.x, tilemap.entry.y), 0, CAVE_DUDE)
+    player = Player(tilemap.entry, 0, CAVE_DUDE)
     camera = get_camera()
     camera.offset = (SCREEN_WIDTH / 2 - 8, SCREEN_HEIGHT / 2 - 8)
 
     # collection of actors
     scene = Scene([
         player,
-        NPC((775, 650), CAVE_BABE, CaveWiseLogic()),
+        NPC((768, 624), CAVE_BABE, CaveNPC()),
     ])
 
     # current game actions
@@ -100,6 +102,7 @@ if __name__ == '__main__':
             if not pause:
                 collision_update()
                 movement_update(tilemap)
+                walk_update(tilemap)
 
                 actions.extend(scene.tick())
                 actions = [action for action in actions if not action()]

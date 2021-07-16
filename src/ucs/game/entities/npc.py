@@ -13,10 +13,10 @@ class NPCBehavior:
 
 class NPC(Actor):
 
-    def __init__(self, position: Position, body_frame: Rect, reactions: NPCBehavior):
+    def __init__(self, position: Position, body_frame: Rect, behavior: NPCBehavior):
         super().__init__(*position)
         self.humanoid = HumanoidComponent(self, body_frame)
-        self.reactions = reactions
+        self.behavior = behavior
         self.sight_area = CollisionComponent(self, 20)
         self.seen_actors = []
 
@@ -25,7 +25,7 @@ class NPC(Actor):
         if seen_actor is not None:
             if seen_actor not in self.seen_actors:
                 self.seen_actors.append(seen_actor)
-                return self.reactions.on_sight(self, seen_actor)
+                return self.behavior.on_sight(self, seen_actor)
         return None
 
     def destroy(self) -> None:

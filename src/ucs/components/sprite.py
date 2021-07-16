@@ -24,13 +24,15 @@ _sprite_components: List[SpriteComponent] = []
 _sheet: Texture2D = None
 
 
-def sprite_system_init():
+def sprite_init():
     global _sheet
     _sheet = load_texture(str(pathlib.Path('assets', 'characters_sheet.png')))
 
 
-def sprite_system_update(ctx: RenderContext):
+def sprite_update(ctx: RenderContext):
     for sprite in _sprite_components:
+        if sprite.actor.state is Actor.State.INACTIVE:
+            continue
         off_x, off_y = sprite.offset
         position = sprite.actor.x + off_x, sprite.actor.y + off_y
         ctx.append(DrawMaskedTextureRectCommand(1e6, _sheet, sprite.frame, position))

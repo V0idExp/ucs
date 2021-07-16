@@ -1,7 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from enum import IntEnum
-from typing import Optional, Tuple
-
+from typing import Iterable, Optional, Sequence, Tuple
 
 Rect = Tuple[int, int, int, int]
 Size = Tuple[int, int]
@@ -41,6 +40,7 @@ class Actor(metaclass=ABCMeta):
         self.x = x
         self.y = y
         self.state = Actor.State.ACTIVE
+        self.scene: Scene = None
 
     @property
     def position(self) -> Pos:
@@ -52,6 +52,41 @@ class Actor(metaclass=ABCMeta):
 
     def destroy(self) -> None:
         pass
+
+
+class Scene(list):
+    """
+    A scene for actors.
+    """
+
+    def __init__(self, actors: Optional[Iterable[Actor]]=None):
+        super().__init__(actors)
+        for actor in self:
+            actor.scene = self
+
+    def tick(self) -> Sequence[Action]:
+        to_remove = []
+        for actor in self:
+                action = actor.tick()
+                if action is not None:
+                    yield action
+
+                if actor.state == Actor.State.INACTIVE:
+                    to_remove.append(actor)
+
+        for actor in to_remove:
+            self.remove(actor)
+            actor.destroy()
+            actor.scene = None
+
+    def append(self, actor: Actor) -> None:
+        super().append(actor)
+        actor.scene = self
+
+    def extend(self, iterable: Iterable[Actor]) -> None:
+        super().extend(iterable)
+        for actor in iterable:
+            actor.scene = self
 
 
 class Component:

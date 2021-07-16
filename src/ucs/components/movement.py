@@ -23,13 +23,15 @@ class MovementComponent(Component):
 _movement_components: List[MovementComponent] = None
 
 
-def movement_system_init():
+def movement_init():
     global _movement_components
     _movement_components = []
 
 
-def movement_system_update(tilemap: TileMap):
+def movement_update(tilemap: TileMap):
     for mov in _movement_components:
+        if mov.actor.state is Actor.State.INACTIVE:
+            continue
         x = mov.actor.x + mov.vel_x
         y = mov.actor.y + mov.vel_y
         x0, y0, w, h = mov.rect

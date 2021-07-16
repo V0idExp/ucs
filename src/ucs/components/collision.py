@@ -20,18 +20,21 @@ class CollisionComponent(Component):
 _colliders: List[CollisionComponent] = None
 
 
-def collision_system_init():
+def collision_init():
     global _colliders
     _colliders = []
 
 
-def collision_system_update():
+def collision_update():
     # reset collisions
     for col in _colliders:
         col.collision = None
 
     # check for new ones
     for col in _colliders:
+        if col.actor.state is Actor.State.INACTIVE:
+            continue
+
         x0, y0 = col.actor.x, col.actor.y
         s0 = col.size
 

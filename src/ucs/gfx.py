@@ -98,10 +98,20 @@ class MaskedRenderStage(RenderStage):
         end_mode2d()
 
 
+class UIRenderStage(RenderStage):
+
+    def enter(self):
+        pass
+
+    def exit(self):
+        pass
+
+
 class StageID(IntEnum):
 
     DEFAULT = 0
     MASKED = 1
+    UI = 2
 
 _stages: Mapping[StageID, RenderStage] = None
 
@@ -191,6 +201,7 @@ def gfx_init(window_title: str, screen_size: Size, scaling_factor: float=1.0):
     _stages = {
         StageID.DEFAULT: DefaultRenderStage(),
         StageID.MASKED: MaskedRenderStage(),
+        StageID.UI: UIRenderStage(),
     }
 
 

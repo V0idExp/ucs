@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from ucs.foundation import Event
 
@@ -32,6 +32,26 @@ class FloatAnimation(Animation):
     def seek(self, position: float):
         val = self.start + (self.end - self.start) * position
         setattr(self.obj, self.attr, val)
+
+
+class VectorAnimation(Animation):
+    """
+    2D vector tuple-like property animation.
+    """
+
+    def __init__(self, obj: Any, attr: str, start: Tuple[int, int], end: Tuple[int, int]) -> None:
+        self.obj = obj
+        self.attr = attr
+        self.start = start
+        self.end = end
+        self.seek(0)
+
+    def seek(self, position: float):
+        x0, y0 = self.start
+        x1, y1 = self.end
+        x = x0 + (x1 - x0) * position
+        y = y0 + (y1 - y0) * position
+        setattr(self.obj, self.attr, (x, y))
 
 
 class AnimationPlayer:

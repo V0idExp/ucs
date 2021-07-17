@@ -10,6 +10,7 @@ from ucs.components.walk import walk_init, walk_update
 from ucs.foundation import Action, Actor, Scene
 from ucs.game.actions import (DestroyActorsAction, SequenceAction,
                               ShowMessageAction, SpawnActorsAction)
+from ucs.game.config import TIME_STEP
 from ucs.game.entities import Pickup, Player
 from ucs.game.entities.npc import NPC, NPCBehavior
 from ucs.game.items import Shield, Sword
@@ -20,7 +21,6 @@ from ucs.ui import ui_get_instance, ui_init
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
-TIME_STEP = 1 / 60.0
 DRAW_SCALE = 2.0
 
 CAVE_DUDE = (0, 104, 16, 16)

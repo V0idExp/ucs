@@ -23,6 +23,10 @@ class HumanoidComponent(Component):
             off_y += 10
             self.left_hand = SpriteComponent(self.actor, item.image, (off_x, off_y))
 
+    @property
+    def has_weapon(self) -> bool:
+        return self.right_hand is not None
+
     def destroy(self) -> None:
         if self.left_hand is not None:
             self.left_hand.destroy()

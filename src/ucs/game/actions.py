@@ -1,8 +1,11 @@
 from dataclasses import dataclass
-from typing import Callable, List, Sequence, Union
+from typing import Callable, List, Sequence
 
-from ucs.foundation import Action, Scene, Actor
+from ucs.anim import AnimationPlayer, VectorPropertyAnimation
+from ucs.components.sprite import SpriteComponent
+from ucs.foundation import Action, Actor, Scene
 from ucs.game.components import HumanoidComponent
+from ucs.game.config import TIME_STEP
 from ucs.game.items import Item
 from ucs.ui import ui_get_instance
 
@@ -66,3 +69,25 @@ class DestroyActorsAction(Action):
         for actor in self.actors:
             actor.state = Actor.State.INACTIVE
         return True
+
+
+class MeleeAttackAction(Action):
+
+    def __init__(self, weapon: SpriteComponent) -> None:
+        dx, dy = weapon.offset
+        self.attack_anim = AnimationPlayer(
+            duration=0.2,
+            channels=[
+                VectorPropertyAnimation(
+                    weapon,
+                    'offset',
+                    [
+                        (0.0, (dx, dy)),
+                        (0.5, (dx, dy - 2)),
+                        (1.0, (dx, dy)),
+                    ]),
+                ])
+
+    def __call__(self) -> bool:
+        self.attack_anim.play(TIME_STEP)
+        return self.attack_anim.is_finished

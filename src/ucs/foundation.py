@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from enum import IntEnum
-from typing import Iterable, Optional, Sequence, Tuple
+from typing import (Callable, Generic, Iterable, Optional, Sequence, Tuple,
+                    TypeVar)
 
 Rect = Tuple[int, int, int, int]
 Size = Tuple[int, int]
@@ -105,3 +106,23 @@ class Component:
 
     def destroy(self) -> None:
         pass
+
+
+T = TypeVar('T')
+class Event(Generic[T]):
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.subscribers = []
+
+    def __iadd__(self, listener: Callable[..., None]):
+        self.subscribers.append(listener)
+        return self
+
+    def __isub__(self, listener: Callable[..., None]):
+        self.subscribers.remove(listener)
+        return self
+
+    def __call__(self, *args):
+        for listener in self.subscribers:
+            listener(*args)

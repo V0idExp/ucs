@@ -7,7 +7,7 @@ from ucs.components import CollisionComponent
 
 class NPCBehavior:
 
-    def on_sight(self, actor: Actor, other: Actor) -> Optional[Action]:
+    def on_sight(self, npc: 'NPC', other: Actor) -> Optional[Action]:
         pass
 
 
@@ -26,6 +26,7 @@ class NPC(Actor):
             if seen_actor not in self.seen_actors:
                 self.seen_actors.append(seen_actor)
                 return self.behavior.on_sight(self, seen_actor)
+
         return None
 
     def destroy(self) -> None:

@@ -3,6 +3,7 @@ from ucs.input import Key
 
 TIME_STEP = 1 / 60.0
 
+
 #: Key configurations for each player:
 #: (up, down, left, right, primary, secondary)
 PLAYER_CONTROLS_MAP = [

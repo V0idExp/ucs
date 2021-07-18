@@ -7,7 +7,17 @@ from ucs.foundation import Action, Actor, Scene
 from ucs.game.components import HumanoidComponent
 from ucs.game.config import TIME_STEP
 from ucs.game.items import Item
+from ucs.game.state import State
 from ucs.ui import ui_get_instance
+
+
+@dataclass
+class FuncAction(Action):
+
+    callable: Callable
+
+    def __call__(self) -> bool:
+        return self.callable
 
 
 @dataclass
@@ -18,6 +28,7 @@ class WieldItemAction(Action):
 
     def __call__(self) -> bool:
         self.humanoid.wield_item(self.item)
+        State.pickups_count.value += 1
         return True
 
 

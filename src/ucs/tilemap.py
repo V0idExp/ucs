@@ -5,7 +5,7 @@ from raylibpy.spartan import (gen_image_color, image_draw_pixel, image_format,
                               load_texture, load_texture_from_image,
                               unload_image)
 
-from ucs.gfx import DrawTextureRectCommand, RenderContext
+from ucs.gfx import DrawTextureRectCommand, RenderContext, gfx_set_map_params
 
 
 class TileMap:
@@ -94,3 +94,20 @@ class TileMap:
             return filename, rect, flags
 
         return load
+
+
+_active_tilemap: TileMap = None
+
+
+def tilemap_set_active(tilemap: TileMap):
+    global _active_tilemap
+    _active_tilemap = tilemap
+
+    gfx_set_map_params(
+        tilemap.foreground_mask_texture,
+        (tilemap.map.tilewidth, tilemap.map.tileheight),
+        (tilemap.map.width, tilemap.map.height))
+
+
+def tilemap_get_active() -> TileMap:
+    return _active_tilemap

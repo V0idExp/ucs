@@ -7,6 +7,7 @@ from ucs.game.actions import MeleeAttackAction
 from ucs.game.components import HumanoidComponent
 from ucs.game.config import PLAYER_CONTROLS_MAP
 from ucs.input import is_key_pressed, is_key_released
+from ucs.gfx import get_camera
 
 
 class Player(Actor):
@@ -20,6 +21,8 @@ class Player(Actor):
         self.attack = None
 
     def tick(self) -> Optional[Action]:
+        get_camera().target = self.position
+
         self._handle_input()
         return self.attack
 

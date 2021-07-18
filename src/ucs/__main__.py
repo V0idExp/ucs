@@ -1,5 +1,4 @@
 import pathlib
-from typing import List, Optional
 
 from raylibpy.spartan import close_window, get_time, window_should_close
 
@@ -7,44 +6,18 @@ from ucs.components.collision import collision_init, collision_update
 from ucs.components.movement import movement_init, movement_update
 from ucs.components.sprite import sprite_init, sprite_update
 from ucs.components.walk import walk_init, walk_update
-from ucs.foundation import Action, Actor, Scene
-from ucs.game.actions import (DestroyActorsAction, SequenceAction,
-                              ShowMessageAction, SpawnActorsAction)
+from ucs.foundation import Scene
 from ucs.game.config import TIME_STEP
-from ucs.game.entities import Pickup, Player
-from ucs.game.entities.npc import NPC, NPCBehavior
-from ucs.game.items import Shield, Sword
-from ucs.gfx import get_camera, gfx_frame, gfx_init, gfx_set_map_params
+from ucs.game.tutorial import Tutorial
+from ucs.gfx import get_camera, gfx_frame, gfx_init
 from ucs.input import input_update
-from ucs.tilemap import TileMap
+from ucs.tilemap import tilemap_get_active
 from ucs.ui import ui_get_instance, ui_init
+
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 DRAW_SCALE = 2.0
-
-CAVE_DUDE = (0, 104, 16, 16)
-CAVE_BABE = (17, 86, 16, 16)
-CAVE_WISE = (17, 155, 16, 14)
-ROCK = (567, 23, 16, 16)
-
-
-class CaveNPC(NPCBehavior):
-
-    def on_sight(self, npc: Actor, _: Actor) -> Optional[Action]:
-        x, y = npc.position
-
-        def spawn_pickups():
-            return [
-                Pickup((x - 32, y), Shield()),
-                Pickup((x + 32, y), Sword()),
-            ]
-
-        return SequenceAction([
-            ShowMessageAction('It\'s dangerous to go alone!\nTake these!'),
-            DestroyActorsAction([npc]),
-            SpawnActorsAction(spawn_pickups, npc.scene),
-        ])
 
 
 if __name__ == '__main__':
@@ -55,32 +28,17 @@ if __name__ == '__main__':
     movement_init()
     collision_init()
 
-    # load the map
-    tilemap = TileMap(pathlib.Path('assets', 'test_indoor.tmx'))
-
-    gfx_set_map_params(
-        tilemap.foreground_mask_texture,
-        (tilemap.map.tilewidth, tilemap.map.tileheight),
-        (tilemap.map.width, tilemap.map.height))
-
-    player = Player(tilemap.entry, 0, CAVE_DUDE)
     camera = get_camera()
     camera.offset = (SCREEN_WIDTH / 2 - 8, SCREEN_HEIGHT / 2 - 8)
-
-    # collection of actors
-    scene = Scene([
-        player,
-        NPC((768, 624), CAVE_BABE, CaveNPC()),
-    ])
-
-    # current game actions
-    actions: List[Action] = []
 
     # time vars
     time_acc = 0
     last_update = get_time()
 
     ui = ui_get_instance()
+
+    game = Tutorial()
+    game.enter()
 
     # main loop
     while not window_should_close():
@@ -101,17 +59,17 @@ if __name__ == '__main__':
             # tick actors and update components if not in pause
             if not pause:
                 collision_update()
-                movement_update(tilemap)
-                walk_update(tilemap)
+                movement_update(tilemap_get_active())
+                walk_update(tilemap_get_active())
 
-                actions.extend(scene.tick())
-                actions = [action for action in actions if not action()]
-
-                camera.target = player.position
+                game.actions.extend(game.scene.tick())
+                game.actions = [action for action in game.actions if not action()]
 
             with gfx_frame() as ctx:
-                tilemap.draw(ctx)
+                tilemap_get_active().draw(ctx)
                 sprite_update(ctx)
                 ui.draw(ctx)
+
+    game.exit()
 
     close_window()

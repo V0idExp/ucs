@@ -1,19 +1,15 @@
-import pathlib
-
 from raylibpy.spartan import close_window, get_time, window_should_close
 
 from ucs.components.collision import collision_init, collision_update
 from ucs.components.movement import movement_init, movement_update
 from ucs.components.sprite import sprite_init, sprite_update
 from ucs.components.walk import walk_init, walk_update
-from ucs.foundation import Scene
 from ucs.game.config import TIME_STEP
 from ucs.game.tutorial import Tutorial
 from ucs.gfx import get_camera, gfx_frame, gfx_init
 from ucs.input import input_update
 from ucs.tilemap import tilemap_get_active
 from ucs.ui import ui_get_instance, ui_init
-
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600

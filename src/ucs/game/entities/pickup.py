@@ -9,17 +9,18 @@ from ucs.game.items import Item
 
 class Pickup(Actor):
 
-    def __init__(self, position: Tuple[int, int], item: Item):
+    def __init__(self, position: Tuple[int, int], item: Item, name: str):
         super().__init__(*position)
         self.item = item
         self.collider = CollisionComponent(self, 16)
         self.sprite = SpriteComponent(self, item.image)
+        self.name = name
 
     def tick(self) -> Optional[Action]:
         if self.collider.collision is not None and isinstance(self.collider.collision, Player):
             self.state = Actor.State.INACTIVE
             target = self.collider.collision
-            return WieldItemAction(target.humanoid, self.item)
+            return WieldItemAction(target.humanoid, self.item, self.name)
 
         return None
 

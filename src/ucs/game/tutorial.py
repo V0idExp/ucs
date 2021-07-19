@@ -21,8 +21,8 @@ class TutorialNPC(NPCBehavior):
 
         def spawn_pickups():
             return [
-                Pickup((x - 32, y), Shield()),
-                Pickup((x + 32, y), Sword()),
+                Pickup((x - 32, y), Shield(), 'shield'),
+                Pickup((x + 32, y), Sword(), 'sword'),
             ]
 
         return SequenceAction([
@@ -43,7 +43,7 @@ class Tutorial(Game, metaclass=ReactiveListener):
             NPC((768, 624), CAVE_BABE, TutorialNPC())
         ])
 
-    @react(pickups=State.pickups_count)
-    def _on_pickups_count_change(self, pickups: int):
-        if pickups == 2:
+    @react(pickups=State.pickups)
+    def _on_pickups_changed(self, pickups: list[str]):
+        if 'sword' in pickups and 'shield' in pickups:
             self.actions.append(ShowMessageAction('Now, defeat these mobs!'))

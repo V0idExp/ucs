@@ -25,10 +25,11 @@ class WieldItemAction(Action):
 
     humanoid: HumanoidComponent
     item: Item
+    name: str
 
     def __call__(self) -> bool:
         self.humanoid.wield_item(self.item)
-        State.pickups_count.value += 1
+        State.pickups.append(self.name)
         return True
 
 

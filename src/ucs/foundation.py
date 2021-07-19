@@ -17,6 +17,11 @@ class Action(metaclass=ABCMeta):
     An object representing an abstract action performed by an actor.
     """
 
+    finished: bool
+
+    def __init__(self) -> None:
+        self.finished = False
+
     @abstractmethod
     def __call__(self) -> bool:
         """
@@ -41,11 +46,12 @@ class Actor(metaclass=ABCMeta):
         INACTIVE = 0
         ACTIVE = 1
 
-    def __init__(self, x: int, y: int) -> None:
+    def __init__(self, x: int, y: int, name: str='') -> None:
         self.x = x
         self.y = y
         self.state = Actor.State.ACTIVE
         self.scene: Scene = None
+        self.name = name or f'{self.__class__.__name__}_{id(self)}'
 
     @property
     def position(self) -> Position:

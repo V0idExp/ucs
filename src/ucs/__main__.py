@@ -59,7 +59,9 @@ if __name__ == '__main__':
                 walk_update(tilemap_get_active())
 
                 game.actions.extend(game.scene.tick())
-                game.actions = [action for action in game.actions if not action()]
+                for action in game.actions:
+                    action.finished = action()
+                game.actions = [action for action in game.actions if not action.finished]
 
             with gfx_frame() as ctx:
                 tilemap_get_active().draw(ctx)

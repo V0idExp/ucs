@@ -1,36 +1,14 @@
 from dataclasses import dataclass
-from typing import Callable, List, Sequence
+from typing import List
 
 from ucs.anim import AnimationPlayer, VectorPropertyAnimation
 from ucs.components.sprite import SpriteComponent
-from ucs.foundation import Action, Actor, Scene
+from ucs.foundation import Action
 from ucs.game.components import HumanoidComponent
 from ucs.game.config import TIME_STEP
 from ucs.game.items import Item
 from ucs.game.state import State
 from ucs.ui import ui_get_instance
-
-
-@dataclass
-class FuncAction(Action):
-
-    callable: Callable
-
-    def __call__(self) -> bool:
-        return self.callable
-
-
-@dataclass
-class WieldItemAction(Action):
-
-    humanoid: HumanoidComponent
-    item: Item
-    name: str
-
-    def __call__(self) -> bool:
-        self.humanoid.wield_item(self.item)
-        State.pickups.append(self.name)
-        return True
 
 
 class SequenceAction(Action):
@@ -44,6 +22,7 @@ class SequenceAction(Action):
             if not self.actions[0]():
                 return False
             self.actions.pop(0)
+        return True
 
 
 class ShowMessageAction(Action):
@@ -61,25 +40,16 @@ class ShowMessageAction(Action):
         return not ui.prompt
 
 
-class SpawnActorsAction(Action):
+@dataclass
+class WieldItemAction(Action):
 
-    def __init__(self, factory: Callable[[], Sequence[Actor]], scene: Scene) -> None:
-        self.factory = factory
-        self.scene = scene
-
-    def __call__(self) -> bool:
-        self.scene.extend(self.factory())
-        return True
-
-
-class DestroyActorsAction(Action):
-
-    def __init__(self, actors: Sequence[Actor]) -> None:
-        self.actors = actors
+    humanoid: HumanoidComponent
+    item: Item
+    name: str
 
     def __call__(self) -> bool:
-        for actor in self.actors:
-            actor.state = Actor.State.INACTIVE
+        self.humanoid.wield_item(self.item)
+        State.pickups.append(self.name)
         return True
 
 

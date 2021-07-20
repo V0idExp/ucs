@@ -4,6 +4,7 @@ from ucs.components import CollisionComponent
 from ucs.components.walk import WalkComponent
 from ucs.foundation import Action, Actor, Position, Rect
 from ucs.game.components import HumanoidComponent
+from ucs.game.consts import ActorTeamBit
 
 
 class NPCBehavior:
@@ -20,8 +21,13 @@ class NPCBehavior:
 
 class NPC(Actor):
 
-    def __init__(self, position: Position, body_frame: Rect, behavior: Type[NPCBehavior]):
+    def __init__(self, position: Position, body_frame: Rect, behavior: Type[NPCBehavior], team_bit: ActorTeamBit=0, enemy_mask: int=0):
         super().__init__(*position)
+        self.metadata.update({
+            'team_bit': team_bit,
+            'enemy_mask': enemy_mask,
+        })
+
         self.humanoid = HumanoidComponent(self, body_frame)
         self.behavior = behavior(self)
         self.sight_area = CollisionComponent(self, 30)

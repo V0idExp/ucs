@@ -6,6 +6,7 @@ from ucs.components.walk import WalkDirection
 from ucs.foundation import Action, Game, ReactiveListener, react
 from ucs.game.actions import (SequenceAction, ShowMessageAction, WaitAction,
                               WalkAction)
+from ucs.game.consts import ActorTeamBit
 from ucs.game.entities import Pickup, Player
 from ucs.game.entities.npc import NPC, NPCBehavior
 from ucs.game.items.shield import Shield
@@ -49,8 +50,8 @@ class TutorialNPCBehavior(NPCBehavior, metaclass=ReactiveListener):
 
             def spawn_mobs():
                 self.npc.scene.extend([
-                    NPC((656, 656), CAVE_BRUTE, MobNPCBehavior),
-                    NPC((880, 656), CAVE_BRUTE, MobNPCBehavior),
+                    NPC((656, 656), CAVE_BRUTE, MobNPCBehavior, ActorTeamBit.ENEMY, ActorTeamBit.PLAYER),
+                    NPC((880, 656), CAVE_BRUTE, MobNPCBehavior, ActorTeamBit.ENEMY, ActorTeamBit.PLAYER),
                 ])
                 self.mobs_spawned = True
                 return True
@@ -86,5 +87,5 @@ class Tutorial(Game):
 
         self.scene.extend([
             Player(tilemap.entry, 0, CAVE_DUDE),
-            NPC((768, 624), CAVE_BABE, TutorialNPCBehavior)
+            NPC((768, 624), CAVE_BABE, TutorialNPCBehavior, ActorTeamBit.FRIEND)
         ])

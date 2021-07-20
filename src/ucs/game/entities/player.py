@@ -6,6 +6,7 @@ from ucs.foundation import Action, Actor, Position, Rect
 from ucs.game.actions import WalkAction
 from ucs.game.components import HumanoidComponent
 from ucs.game.config import PLAYER_CONTROLS_MAP
+from ucs.game.consts import ActorTeamBit
 from ucs.gfx import get_camera
 from raylibpy.spartan import is_key_down, is_key_pressed
 
@@ -13,6 +14,10 @@ class Player(Actor):
 
     def __init__(self, position: Position, gamepad: int, body_frame: Rect):
         super().__init__(*position)
+        self.metadata.update({
+            'team_bit': ActorTeamBit.PLAYER,
+            'enemy_mask': ActorTeamBit.ENEMY,
+        })
         self.gamepad = gamepad
         self.humanoid = HumanoidComponent(self, body_frame)
         self.collider = CollisionComponent(self, 16)

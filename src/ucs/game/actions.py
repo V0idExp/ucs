@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Collection, List, Optional, Type
+from typing import List, Optional
 
 from raylibpy.spartan import get_time
 from ucs.anim import AnimationPlayer
@@ -82,7 +82,7 @@ class MeleeAttackAction(Action):
         col, row = tilemap.pixels_to_coords(self.actor.position)
         nearby_actors = list(tilemap.get_nearest_occupants(col, row))
         for actor in nearby_actors:
-            if actor != self.actor:
+            if actor != self.actor and self.actor.metadata.get('team_bit', 0) & actor.metadata.get('enemy_mask', 0):
                 actor.state = Actor.State.INACTIVE
 
 

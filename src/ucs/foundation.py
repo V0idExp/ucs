@@ -52,6 +52,7 @@ class Actor(metaclass=ABCMeta):
         self.state = Actor.State.ACTIVE
         self.scene: Scene = None
         self.name = name or f'{self.__class__.__name__}_{id(self)}'
+        self.metadata = {}
 
     @property
     def position(self) -> Position:

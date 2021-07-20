@@ -1,15 +1,14 @@
 from typing import Any, Sequence
 
 import pytmx
-from raylibpy.colors import BLACK, RED, WHITE
+from raylibpy.colors import BLACK, WHITE
 from raylibpy.consts import PIXELFORMAT_UNCOMPRESSED_GRAYSCALE
 from raylibpy.spartan import (gen_image_color, image_draw_pixel, image_format,
                               load_texture, load_texture_from_image,
                               unload_image)
 
 from ucs.foundation import Position
-from ucs.gfx import (DrawRectOutlineCommand, DrawTextureRectCommand,
-                     RenderContext, gfx_set_map_params)
+from ucs.gfx import DrawTextureRectCommand, RenderContext, gfx_set_map_params
 
 
 class TileMap:
@@ -116,15 +115,6 @@ class TileMap:
                         tex = self.textures[filename]
                         ctx.append(DrawTextureRectCommand(
                             r * self.map.width + c, tex, rect, (x_offset, y_offset)))
-
-        for i, occupant in enumerate(self.occupants):
-            if occupant is None:
-                continue
-            w = self.map.tilewidth
-            h = self.map.tileheight
-            x = self.x + (i % self.map.width) * w
-            y = self.y + (i // self.map.width) * h
-            ctx.append(DrawRectOutlineCommand(1e6, (x, y, w, h), RED))
 
     def _image_loader(self, filename, flags, **kwargs):
         if filename not in self.textures:

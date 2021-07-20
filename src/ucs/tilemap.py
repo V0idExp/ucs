@@ -4,6 +4,7 @@ from raylibpy.consts import PIXELFORMAT_UNCOMPRESSED_GRAYSCALE
 from raylibpy.spartan import (gen_image_color, image_draw_pixel, image_format,
                               load_texture, load_texture_from_image,
                               unload_image)
+from ucs.foundation import Position
 
 from ucs.gfx import DrawRectOutlineCommand, DrawTextureRectCommand, RenderContext, gfx_set_map_params
 
@@ -66,6 +67,11 @@ class TileMap:
         tex = load_texture_from_image(img)
         unload_image(img)
         self.foreground_mask_texture = tex
+
+    def pixels_to_coords(self, pixels_pos: Position) -> Position:
+        col = int((pixels_pos[0] - self.x) // self.map.tilewidth)
+        row = int((pixels_pos[1] - self.y) // self.map.tileheight)
+        return col, row
 
     def is_walkable_at(self, col, row) -> bool:
         index = row * self.map.width + col

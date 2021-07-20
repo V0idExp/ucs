@@ -42,7 +42,7 @@ def walk_init():
 def walk_update(tilemap: TileMap):
     for walker in _walk_components:
 
-        col, row = _compute_tile_coords(tilemap, walker.actor.position)
+        col, row = tilemap.pixels_to_coords(walker.actor.position)
 
         if walker.actor.state is Actor.State.INACTIVE:
             # no movement performed, just set the tile as occupied
@@ -95,7 +95,7 @@ def walk_update(tilemap: TileMap):
             tilemap.set_occupied_at(*walker.dst, True)
         # otherwise, mark the tile at which the walker stopped as occupied
         else:
-            tilemap.set_occupied_at(*_compute_tile_coords(tilemap, walker.actor.position), True)
+            tilemap.set_occupied_at(*tilemap.pixels_to_coords(walker.actor.position), True)
 
 
 def _get_adjacent_tile(coord: Position, direction: WalkDirection, tilemap: TileMap) -> Position:
@@ -115,10 +115,3 @@ def _get_adjacent_tile(coord: Position, direction: WalkDirection, tilemap: TileM
     dst_col = int(clamp(dst_col, 0, tilemap.map.width))
 
     return dst_col, dst_row
-
-
-def _compute_tile_coords(tilemap: TileMap, pos: Position) -> Position:
-    x, y = pos
-    col = int((x - tilemap.x) // tilemap.map.tilewidth)
-    row = int((y - tilemap.y) // tilemap.map.tileheight)
-    return col, row

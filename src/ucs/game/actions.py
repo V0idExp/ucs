@@ -1,8 +1,11 @@
 from dataclasses import dataclass
 from typing import List
 
+from raylibpy.spartan import get_time
+
 from ucs.anim import AnimationPlayer, VectorPropertyAnimation
 from ucs.components.sprite import SpriteComponent
+from ucs.components.walk import WalkComponent, WalkDirection
 from ucs.foundation import Action
 from ucs.game.components import HumanoidComponent
 from ucs.game.config import TIME_STEP
@@ -73,3 +76,34 @@ class MeleeAttackAction(Action):
     def __call__(self) -> bool:
         self.attack_anim.play(TIME_STEP)
         return self.attack_anim.is_finished
+
+
+class WalkAction(Action):
+
+    def __init__(self, walker: WalkComponent, direction: WalkDirection) -> None:
+        self.started = False
+        self.walker = walker
+        self.direction = direction
+
+    def __call__(self) -> bool:
+        if not self.started:
+            self.walker.direction = self.direction
+            self.started = True
+            return False
+
+        self.walker.direction = WalkDirection.STOP
+        return self.walker.dst is None
+
+
+class WaitAction(Action):
+
+    def __init__(self, seconds: float) -> None:
+        super().__init__()
+        self.seconds = seconds
+        self.started_at = None
+
+    def __call__(self) -> bool:
+        if self.started_at is None:
+            self.started_at = get_time()
+        self.seconds -= get_time() - self.started_at
+        return self.seconds <= 0

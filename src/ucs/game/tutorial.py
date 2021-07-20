@@ -1,8 +1,11 @@
 import pathlib
+import random
 from typing import Optional
 
+from ucs.components.walk import WalkDirection
 from ucs.foundation import Action, Game, ReactiveListener, react
-from ucs.game.actions import SequenceAction, ShowMessageAction
+from ucs.game.actions import (SequenceAction, ShowMessageAction, WaitAction,
+                              WalkAction)
 from ucs.game.entities import Pickup, Player
 from ucs.game.entities.npc import NPC, NPCBehavior
 from ucs.game.items import Shield, Sword
@@ -65,7 +68,12 @@ class TutorialNPCBehavior(NPCBehavior, metaclass=ReactiveListener):
 
 class MobNPCBehavior(NPCBehavior):
 
-    pass
+    def on_idle(self) -> Optional[Action]:
+        direction = random.choice(list(WalkDirection))
+        return SequenceAction([
+            WaitAction(1.0),
+            WalkAction(self.npc.walker, direction),
+        ])
 
 
 class Tutorial(Game):

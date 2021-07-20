@@ -7,7 +7,6 @@ from ucs.components.walk import walk_init, walk_update
 from ucs.game.config import TIME_STEP
 from ucs.game.tutorial import Tutorial
 from ucs.gfx import get_camera, gfx_frame, gfx_init
-from ucs.input import input_update
 from ucs.tilemap import tilemap_get_active
 from ucs.ui import ui_get_instance, ui_init
 
@@ -45,9 +44,6 @@ if __name__ == '__main__':
         # fixed-frame time step
         while time_acc >= TIME_STEP:
             time_acc -= TIME_STEP
-
-            # handle input
-            input_update()
 
             # update the UI
             pause = ui.update()

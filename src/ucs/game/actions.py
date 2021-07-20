@@ -1,15 +1,13 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 from raylibpy.spartan import get_time
-
-from ucs.anim import AnimationPlayer, VectorPropertyAnimation
-from ucs.components.sprite import SpriteComponent
+from ucs.anim import AnimationPlayer
 from ucs.components.walk import WalkComponent, WalkDirection
-from ucs.foundation import Action
+from ucs.foundation import Action, Actor
 from ucs.game.components import HumanoidComponent
 from ucs.game.config import TIME_STEP
-from ucs.game.items import Item
+from ucs.game.items.item import Item
 from ucs.game.state import State
 from ucs.ui import ui_get_instance
 
@@ -51,45 +49,48 @@ class WieldItemAction(Action):
     name: str
 
     def __call__(self) -> bool:
-        self.humanoid.wield_item(self.item)
+        self.humanoid.equip_item(self.item)
         State.pickups.append(self.name)
         return True
 
 
 class MeleeAttackAction(Action):
 
-    def __init__(self, weapon: SpriteComponent) -> None:
-        dx, dy = weapon.offset
-        self.attack_anim = AnimationPlayer(
-            duration=0.2,
-            channels=[
-                VectorPropertyAnimation(
-                    weapon,
-                    'offset',
-                    [
-                        (0.0, (dx, dy)),
-                        (0.5, (dx, dy - 2)),
-                        (1.0, (dx, dy)),
-                    ]),
-                ])
+    def __init__(self, actor: Actor, damage: int, pre_anim: Optional[AnimationPlayer]=None, post_anim: Optional[AnimationPlayer]=None) -> None:
+        self.actor = actor
+        self.damage = damage
+        self.pre_anim = pre_anim
+        self.post_anim = post_anim
 
     def __call__(self) -> bool:
-        self.attack_anim.play(TIME_STEP)
-        return self.attack_anim.is_finished
+        is_attack_finished = True
+        if self.pre_anim is not None:
+            self.pre_anim.play(TIME_STEP)
+            is_attack_finished &= self.pre_anim.is_finished
+            if is_attack_finished:
+                # TODO: do damage!
+                pass
+
+        if is_attack_finished and self.post_anim is not None:
+            self.post_anim.play(TIME_STEP)
+            is_attack_finished &= self.post_anim.is_finished
+
+        return is_attack_finished
 
 
 class WalkAction(Action):
 
-    def __init__(self, walker: WalkComponent, direction: WalkDirection) -> None:
+    def __init__(self, walker: WalkComponent, direction: WalkDirection, continuous: bool=False) -> None:
         self.started = False
         self.walker = walker
         self.direction = direction
+        self.continuous = continuous
 
     def __call__(self) -> bool:
-        if not self.started:
+        if not self.started or self.continuous:
             self.walker.direction = self.direction
             self.started = True
-            return False
+            return self.direction is WalkDirection.STOP
 
         self.walker.direction = WalkDirection.STOP
         return self.walker.dst is None

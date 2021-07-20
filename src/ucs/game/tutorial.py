@@ -8,7 +8,8 @@ from ucs.game.actions import (SequenceAction, ShowMessageAction, WaitAction,
                               WalkAction)
 from ucs.game.entities import Pickup, Player
 from ucs.game.entities.npc import NPC, NPCBehavior
-from ucs.game.items import Shield, Sword
+from ucs.game.items.shield import Shield
+from ucs.game.items.sword import Sword
 from ucs.game.state import State
 from ucs.tilemap import TileMap, tilemap_set_active
 

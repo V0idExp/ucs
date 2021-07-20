@@ -1,4 +1,4 @@
-from ucs.input import Key
+import raylibpy.consts as keys
 
 
 TIME_STEP = 1 / 60.0
@@ -8,7 +8,7 @@ TIME_STEP = 1 / 60.0
 #: (up, down, left, right, primary, secondary)
 PLAYER_CONTROLS_MAP = [
     # player 0
-    (Key.W, Key.S, Key.A, Key.D, Key.Q, Key.E),
+    (keys.KEY_W, keys.KEY_S, keys.KEY_A, keys.KEY_D, keys.KEY_E, keys.KEY_Q),
     # player 1
-    (Key.UP, Key.DOWN, Key.LEFT, Key.RIGHT, Key.J, Key.K),
+    (keys.KEY_UP, keys.KEY_DOWN, keys.KEY_LEFT, keys.KEY_RIGHT, keys.KEY_J, keys.KEY_K),
 ]

@@ -4,7 +4,7 @@ from ucs.components import CollisionComponent, SpriteComponent
 from ucs.foundation import Action, Actor
 from ucs.game.actions import WieldItemAction
 from ucs.game.entities import Player
-from ucs.game.items import Item
+from ucs.game.items.item import Item
 
 
 class Pickup(Actor):

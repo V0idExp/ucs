@@ -1,6 +1,7 @@
 from typing import Optional, Type
 
 from ucs.components import CollisionComponent
+from ucs.components.walk import WalkComponent
 from ucs.foundation import Action, Actor, Position, Rect
 from ucs.game.components import HumanoidComponent
 
@@ -23,7 +24,8 @@ class NPC(Actor):
         super().__init__(*position)
         self.humanoid = HumanoidComponent(self, body_frame)
         self.behavior = behavior(self)
-        self.sight_area = CollisionComponent(self, 20)
+        self.sight_area = CollisionComponent(self, 30)
+        self.walker = WalkComponent(self, 1)
         self.seen_actors = []
         self.current_action = None
 
@@ -47,3 +49,4 @@ class NPC(Actor):
     def destroy(self) -> None:
         self.humanoid.destroy()
         self.sight_area.destroy()
+        self.walker.destroy()

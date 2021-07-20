@@ -1,11 +1,11 @@
 import pytmx
-from raylibpy.colors import BLACK, WHITE
+from raylibpy.colors import BLACK, RED, WHITE
 from raylibpy.consts import PIXELFORMAT_UNCOMPRESSED_GRAYSCALE
 from raylibpy.spartan import (gen_image_color, image_draw_pixel, image_format,
                               load_texture, load_texture_from_image,
                               unload_image)
 
-from ucs.gfx import DrawTextureRectCommand, RenderContext, gfx_set_map_params
+from ucs.gfx import DrawRectOutlineCommand, DrawTextureRectCommand, RenderContext, gfx_set_map_params
 
 
 class TileMap:
@@ -32,6 +32,9 @@ class TileMap:
 
         # walkability matrix
         self.walk_matrix = [True] * self.map.width * self.map.height
+
+        # busy matrix (temporary occupied tiles)
+        self.occupied_matrix = [False] * self.map.width * self.map.height
 
         # image for foreground mask texture
         img = gen_image_color(self.map.width, self.map.height, WHITE)
@@ -65,7 +68,11 @@ class TileMap:
         self.foreground_mask_texture = tex
 
     def is_walkable_at(self, col, row) -> bool:
-        return self.walk_matrix[row * self.map.width + col]
+        index = row * self.map.width + col
+        return self.walk_matrix[index] and not self.occupied_matrix[index]
+
+    def set_occupied_at(self, col: int, row: int, occupied: bool):
+        self.occupied_matrix[row * self.map.width + col] = occupied
 
     def draw(self, ctx: RenderContext):
         tile_width = self.map.tilewidth
@@ -85,6 +92,15 @@ class TileMap:
                         tex = self.textures[filename]
                         ctx.append(DrawTextureRectCommand(
                             r * self.map.width + c, tex, rect, (x_offset, y_offset)))
+
+        for i, occupied in enumerate(self.occupied_matrix):
+            if not occupied:
+                continue
+            w = self.map.tilewidth
+            h = self.map.tileheight
+            x = self.x + (i % self.map.width) * w
+            y = self.y + (i // self.map.width) * h
+            ctx.append(DrawRectOutlineCommand(1e6, (x, y, w, h), RED))
 
     def _image_loader(self, filename, flags, **kwargs):
         if filename not in self.textures:

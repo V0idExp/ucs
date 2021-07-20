@@ -1,12 +1,15 @@
+from typing import Any, Sequence
+
 import pytmx
 from raylibpy.colors import BLACK, RED, WHITE
 from raylibpy.consts import PIXELFORMAT_UNCOMPRESSED_GRAYSCALE
 from raylibpy.spartan import (gen_image_color, image_draw_pixel, image_format,
                               load_texture, load_texture_from_image,
                               unload_image)
-from ucs.foundation import Position
 
-from ucs.gfx import DrawRectOutlineCommand, DrawTextureRectCommand, RenderContext, gfx_set_map_params
+from ucs.foundation import Position
+from ucs.gfx import (DrawRectOutlineCommand, DrawTextureRectCommand,
+                     RenderContext, gfx_set_map_params)
 
 
 class TileMap:
@@ -34,8 +37,8 @@ class TileMap:
         # walkability matrix
         self.walk_matrix = [True] * self.map.width * self.map.height
 
-        # busy matrix (temporary occupied tiles)
-        self.occupied_matrix = [False] * self.map.width * self.map.height
+        # map of occupants for each tile
+        self.occupants = [None] * self.map.width * self.map.height
 
         # image for foreground mask texture
         img = gen_image_color(self.map.width, self.map.height, WHITE)
@@ -74,11 +77,26 @@ class TileMap:
         return col, row
 
     def is_walkable_at(self, col, row) -> bool:
-        index = row * self.map.width + col
-        return self.walk_matrix[index] and not self.occupied_matrix[index]
+        if col >= 0 and col < self.map.width and row >= 0 and row < self.map.height:
+            index = row * self.map.width + col
+            return self.walk_matrix[index] and not self.occupants[index]
+        return False
 
-    def set_occupied_at(self, col: int, row: int, occupied: bool):
-        self.occupied_matrix[row * self.map.width + col] = occupied
+    def set_occupant_at(self, col: int, row: int, occupant: Any):
+        if col >= 0 and col < self.map.width and row >= 0 and row < self.map.height:
+            self.occupants[row * self.map.width + col] = occupant
+
+    def get_occupant_at(self, col: int, row: int) -> Any:
+        if col >= 0 and col < self.map.width and row >= 0 and row < self.map.height:
+            return self.occupants[row * self.map.width + col]
+        return None
+
+    def get_nearest_occupants(self, col, row) -> Sequence[Any]:
+        adjacent_coords = [(col - 1, row), (col + 1, row), (col, row - 1), (col, row + 1)]
+        for coord in adjacent_coords:
+            actor = self.get_occupant_at(*coord)
+            if actor is not None:
+                yield actor
 
     def draw(self, ctx: RenderContext):
         tile_width = self.map.tilewidth
@@ -99,8 +117,8 @@ class TileMap:
                         ctx.append(DrawTextureRectCommand(
                             r * self.map.width + c, tex, rect, (x_offset, y_offset)))
 
-        for i, occupied in enumerate(self.occupied_matrix):
-            if not occupied:
+        for i, occupant in enumerate(self.occupants):
+            if occupant is None:
                 continue
             w = self.map.tilewidth
             h = self.map.tileheight

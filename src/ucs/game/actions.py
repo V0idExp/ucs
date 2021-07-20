@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Collection, List, Optional, Type
 
 from raylibpy.spartan import get_time
 from ucs.anim import AnimationPlayer
@@ -9,6 +9,7 @@ from ucs.game.components import HumanoidComponent
 from ucs.game.config import TIME_STEP
 from ucs.game.items.item import Item
 from ucs.game.state import State
+from ucs.tilemap import tilemap_get_active
 from ucs.ui import ui_get_instance
 
 
@@ -63,19 +64,26 @@ class MeleeAttackAction(Action):
         self.post_anim = post_anim
 
     def __call__(self) -> bool:
-        is_attack_finished = True
+        is_anim_finished = True
         if self.pre_anim is not None:
             self.pre_anim.play(TIME_STEP)
-            is_attack_finished &= self.pre_anim.is_finished
-            if is_attack_finished:
-                # TODO: do damage!
-                pass
+            is_anim_finished &= self.pre_anim.is_finished
+            if is_anim_finished:
+                self.__do_damage()
 
-        if is_attack_finished and self.post_anim is not None:
+        if is_anim_finished and self.post_anim is not None:
             self.post_anim.play(TIME_STEP)
-            is_attack_finished &= self.post_anim.is_finished
+            is_anim_finished &= self.post_anim.is_finished
 
-        return is_attack_finished
+        return is_anim_finished
+
+    def __do_damage(self):
+        tilemap = tilemap_get_active()
+        col, row = tilemap.pixels_to_coords(self.actor.position)
+        nearby_actors = list(tilemap.get_nearest_occupants(col, row))
+        for actor in nearby_actors:
+            if actor != self.actor:
+                actor.state = Actor.State.INACTIVE
 
 
 class WalkAction(Action):

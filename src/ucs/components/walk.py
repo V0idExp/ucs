@@ -29,28 +29,39 @@ class WalkComponent(Component):
 
     def destroy(self) -> None:
         _walk_components.remove(self)
+        _to_remove.append(self)
 
 
 _walk_components: List[WalkComponent] = None
+_to_remove: List[WalkComponent] = None
 
 
 def walk_init():
     global _walk_components
+    global _to_remove
     _walk_components = []
+    _to_remove = []
 
 
 def walk_update(tilemap: TileMap):
-    for walker in _walk_components:
+    for garbage in _to_remove:
+        col, row = tilemap.pixels_to_coords(garbage.actor.position)
+        tilemap.set_occupant_at(col, row, None)
+        if garbage.dst is not None:
+            tilemap.set_occupant_at(*garbage.dst, None)
 
+    _to_remove.clear()
+
+    for walker in _walk_components:
         col, row = tilemap.pixels_to_coords(walker.actor.position)
 
         if walker.actor.state is Actor.State.INACTIVE:
             # no movement performed, just set the tile as occupied
-            tilemap.set_occupied_at(col, row, True)
+            tilemap.set_occupant_at(col, row, walker.actor)
             continue
 
         # clear current tile
-        tilemap.set_occupied_at(col, row, False)
+        tilemap.set_occupant_at(col, row, None)
 
         if walker.dst is None and walker.direction is not WalkDirection.STOP:
             # compute the current tile coordinate from absolute position in
@@ -92,10 +103,10 @@ def walk_update(tilemap: TileMap):
 
         # if there's a destination tile, mark it as occupied
         if walker.dst is not None:
-            tilemap.set_occupied_at(*walker.dst, True)
+            tilemap.set_occupant_at(*walker.dst, walker.actor)
         # otherwise, mark the tile at which the walker stopped as occupied
         else:
-            tilemap.set_occupied_at(*tilemap.pixels_to_coords(walker.actor.position), True)
+            tilemap.set_occupant_at(*tilemap.pixels_to_coords(walker.actor.position), walker.actor)
 
 
 def _get_adjacent_tile(coord: Position, direction: WalkDirection, tilemap: TileMap) -> Position:
